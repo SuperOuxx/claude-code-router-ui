@@ -6,8 +6,21 @@ import os from 'os';
 
 const router = express.Router();
 
+function isTruthyEnv(value) {
+  if (typeof value !== 'string') return false;
+  return ['1', 'true', 'yes', 'on'].includes(value.trim().toLowerCase());
+}
+
 router.get('/claude/status', async (req, res) => {
   try {
+    if (isTruthyEnv(process.env.CLAUDE_SKIP_AUTH_CHECK)) {
+      return res.json({
+        authenticated: true,
+        email: 'Auth check skipped',
+        method: 'skip'
+      });
+    }
+
     const credentialsResult = await checkClaudeCredentials();
 
     if (credentialsResult.authenticated) {

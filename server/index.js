@@ -59,8 +59,10 @@ import mime from 'mime-types';
 
 import { getProjects, getSessions, getSessionMessages, renameProject, deleteSession, deleteProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache } from './projects.js';
 import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getActiveClaudeSDKSessions, resolveToolApproval } from './claude-sdk.js';
+import { queryClaudeCLI, abortClaudeCLISession, isClaudeCLISessionActive, getActiveClaudeCLISessions } from './claude-cli.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from './cursor-cli.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from './openai-codex.js';
+import { formatBashInvocation, formatPowerShellInvocation, getClaudeCliTokens } from './utils/claudeCli.js';
 import gitRoutes from './routes/git.js';
 import authRoutes from './routes/auth.js';
 import mcpRoutes from './routes/mcp.js';
@@ -782,6 +784,15 @@ function handleChatConnection(ws) {
     // Wrap WebSocket with writer for consistent interface with SSEStreamWriter
     const writer = new WebSocketWriter(ws);
 
+    const shouldUseClaudeCliChat = () => {
+        const chatMode = (process.env.CLAUDE_CHAT_MODE || '').trim().toLowerCase();
+        if (chatMode === 'cli') return true;
+        if (chatMode === 'sdk') return false;
+
+        const cliTokens = getClaudeCliTokens();
+        return Boolean(cliTokens[0] && /(?:^|[\\/])ccr(?:\\.exe)?$/i.test(cliTokens[0]));
+    };
+
     ws.on('message', async (message) => {
         try {
             const data = JSON.parse(message);
@@ -791,8 +802,12 @@ function handleChatConnection(ws) {
                 console.log('📁 Project:', data.options?.projectPath || 'Unknown');
                 console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
 
-                // Use Claude Agents SDK
-                await queryClaudeSDK(data.command, data.options, writer);
+                if (shouldUseClaudeCliChat()) {
+                    await queryClaudeCLI(data.command, data.options, writer);
+                } else {
+                    // Use Claude Agents SDK (default)
+                    await queryClaudeSDK(data.command, data.options, writer);
+                }
             } else if (data.type === 'cursor-command') {
                 console.log('[DEBUG] Cursor message:', data.command || '[Continue/Resume]');
                 console.log('📁 Project:', data.options?.cwd || 'Unknown');
@@ -823,8 +838,12 @@ function handleChatConnection(ws) {
                 } else if (provider === 'codex') {
                     success = abortCodexSession(data.sessionId);
                 } else {
-                    // Use Claude Agents SDK
-                    success = await abortClaudeSDKSession(data.sessionId);
+                    if (shouldUseClaudeCliChat()) {
+                        success = abortClaudeCLISession(data.sessionId);
+                    } else {
+                        // Use Claude Agents SDK
+                        success = await abortClaudeSDKSession(data.sessionId);
+                    }
                 }
 
                 writer.send({
@@ -865,8 +884,12 @@ function handleChatConnection(ws) {
                 } else if (provider === 'codex') {
                     isActive = isCodexSessionActive(sessionId);
                 } else {
-                    // Use Claude Agents SDK
-                    isActive = isClaudeSDKSessionActive(sessionId);
+                    if (shouldUseClaudeCliChat()) {
+                        isActive = isClaudeCLISessionActive(sessionId);
+                    } else {
+                        // Use Claude Agents SDK
+                        isActive = isClaudeSDKSessionActive(sessionId);
+                    }
                 }
 
                 writer.send({
@@ -878,7 +901,7 @@ function handleChatConnection(ws) {
             } else if (data.type === 'get-active-sessions') {
                 // Get all currently active sessions
                 const activeSessions = {
-                    claude: getActiveClaudeSDKSessions(),
+                    claude: shouldUseClaudeCliChat() ? getActiveClaudeCLISessions() : getActiveClaudeSDKSessions(),
                     cursor: getActiveCursorSessions(),
                     codex: getActiveCodexSessions()
                 };
@@ -1024,17 +1047,24 @@ function handleShellConnection(ws) {
                         }
                     } else {
                         // Use claude command (default) or initialCommand if provided
-                        const command = initialCommand || 'claude';
+                        const defaultCliTokens = getClaudeCliTokens();
+                        const defaultInvocationWin = formatPowerShellInvocation(defaultCliTokens);
+                        const defaultInvocationUnix = formatBashInvocation(defaultCliTokens);
+                        const command = initialCommand || (os.platform() === 'win32' ? defaultInvocationWin : defaultInvocationUnix);
                         if (os.platform() === 'win32') {
                             if (hasSession && sessionId) {
                                 // Try to resume session, but with fallback to new session if it fails
-                                shellCommand = `Set-Location -Path "${projectPath}"; claude --resume ${sessionId}; if ($LASTEXITCODE -ne 0) { claude }`;
+                                const resumeTokens = getClaudeCliTokens(['--resume', sessionId]);
+                                const resumeInvocation = formatPowerShellInvocation(resumeTokens);
+                                shellCommand = `Set-Location -Path "${projectPath}"; ${resumeInvocation}; if ($LASTEXITCODE -ne 0) { ${defaultInvocationWin} }`;
                             } else {
                                 shellCommand = `Set-Location -Path "${projectPath}"; ${command}`;
                             }
                         } else {
                             if (hasSession && sessionId) {
-                                shellCommand = `cd "${projectPath}" && claude --resume ${sessionId} || claude`;
+                                const resumeTokens = getClaudeCliTokens(['--resume', sessionId]);
+                                const resumeInvocation = formatBashInvocation(resumeTokens);
+                                shellCommand = `cd "${projectPath}" && ${resumeInvocation} || ${defaultInvocationUnix}`;
                             } else {
                                 shellCommand = `cd "${projectPath}" && ${command}`;
                             }
@@ -1744,7 +1774,11 @@ async function startServer() {
         const isProduction = fs.existsSync(distIndexPath);
 
         // Log Claude implementation mode
-        console.log(`${c.info('[INFO]')} Using Claude Agents SDK for Claude integration`);
+        const chatMode = (process.env.CLAUDE_CHAT_MODE || '').trim().toLowerCase();
+        const cliTokens = getClaudeCliTokens();
+        const inferredCli = cliTokens[0] && /(?:^|[\\/])ccr(?:\\.exe)?$/i.test(cliTokens[0]);
+        const shouldUseCli = chatMode === 'cli' || (chatMode !== 'sdk' && inferredCli);
+        console.log(`${c.info('[INFO]')} Claude integration: ${c.bright(shouldUseCli ? 'CLI' : 'Agents SDK')}`);
         console.log(`${c.info('[INFO]')} Running in ${c.bright(isProduction ? 'PRODUCTION' : 'DEVELOPMENT')} mode`);
 
         if (!isProduction) {

@@ -3,10 +3,9 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 import { spawn } from 'child_process';
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
 import crypto from 'crypto';
 import { CURSOR_MODELS } from '../../shared/modelConstants.js';
+import { openSqliteReadOnly } from '../utils/sqliteReadOnly.js';
 
 const router = express.Router();
 
@@ -385,12 +384,7 @@ router.get('/sessions', async (req, res) => {
           dbStatMtimeMs = stat.mtimeMs;
         } catch (_) {}
 
-        // Open SQLite database
-        const db = await open({
-          filename: storeDbPath,
-          driver: sqlite3.Database,
-          mode: sqlite3.OPEN_READONLY
-        });
+        const db = openSqliteReadOnly(storeDbPath);
         
         // Get metadata from meta table
         const metaRows = await db.all(`
@@ -588,11 +582,7 @@ router.get('/sessions/:sessionId', async (req, res) => {
     
     
     // Open SQLite database
-    const db = await open({
-      filename: storeDbPath,
-      driver: sqlite3.Database,
-      mode: sqlite3.OPEN_READONLY
-    });
+    const db = openSqliteReadOnly(storeDbPath);
     
     // Get all blobs to build the DAG structure
     const allBlobs = await db.all(`

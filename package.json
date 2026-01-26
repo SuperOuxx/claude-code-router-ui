@@ -50,6 +50,7 @@
     "@codemirror/lang-python": "^6.2.1",
     "@codemirror/merge": "^6.11.1",
     "@codemirror/theme-one-dark": "^6.1.2",
+    "@codemirror/view": "^6.39.11",
     "@iarna/toml": "^2.2.5",
     "@octokit/rest": "^22.0.0",
     "@openai/codex-sdk": "^0.75.0",
@@ -62,7 +63,6 @@
     "@xterm/addon-webgl": "^0.18.0",
     "@xterm/xterm": "^5.5.0",
     "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.2.0",
     "chokidar": "^4.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -90,10 +90,12 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7",
+    "shell-quote": "^1.8.3",
     "tailwind-merge": "^3.3.1",
     "ws": "^8.14.2"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^12.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",

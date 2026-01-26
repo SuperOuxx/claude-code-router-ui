@@ -62,9 +62,8 @@ import fsSync from 'fs';
 import path from 'path';
 import readline from 'readline';
 import crypto from 'crypto';
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
 import os from 'os';
+import { openSqliteReadOnly } from './utils/sqliteReadOnly.js';
 
 // Import TaskMaster detection functions
 async function detectTaskMasterFolder(projectPath) {
@@ -1166,12 +1165,7 @@ async function getCursorSessions(projectPath) {
           dbStatMtimeMs = stat.mtimeMs;
         } catch (_) {}
 
-        // Open SQLite database
-        const db = await open({
-          filename: storeDbPath,
-          driver: sqlite3.Database,
-          mode: sqlite3.OPEN_READONLY
-        });
+        const db = openSqliteReadOnly(storeDbPath);
         
         // Get metadata from meta table
         const metaRows = await db.all(`

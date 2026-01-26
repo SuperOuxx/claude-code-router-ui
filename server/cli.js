@@ -113,6 +113,10 @@ function showStatus() {
     console.log(`       PORT: ${c.bright(process.env.PORT || '3001')} ${c.dim(process.env.PORT ? '' : '(default)')}`);
     console.log(`       DATABASE_PATH: ${c.dim(process.env.DATABASE_PATH || '(using default location)')}`);
     console.log(`       CLAUDE_CLI_PATH: ${c.dim(process.env.CLAUDE_CLI_PATH || 'claude (default)')}`);
+    console.log(`       CLAUDE_CLI_ARGS: ${c.dim(process.env.CLAUDE_CLI_ARGS || '(none)')}`);
+    console.log(`       CLAUDE_CLI_COMMAND: ${c.dim(process.env.CLAUDE_CLI_COMMAND || '(none)')}`);
+    console.log(`       CLAUDE_SKIP_AUTH_CHECK: ${c.dim(process.env.CLAUDE_SKIP_AUTH_CHECK || 'false (default)')}`);
+    console.log(`       CLAUDE_CHAT_MODE: ${c.dim(process.env.CLAUDE_CHAT_MODE || '(auto)')}`);
     console.log(`       CONTEXT_WINDOW: ${c.dim(process.env.CONTEXT_WINDOW || '160000 (default)')}`);
 
     // Claude projects folder
@@ -172,6 +176,10 @@ Environment Variables:
   PORT                Set server port (default: 3001)
   DATABASE_PATH       Set custom database location
   CLAUDE_CLI_PATH     Set custom Claude CLI path
+  CLAUDE_CLI_ARGS     Prepend args to Claude CLI
+  CLAUDE_CLI_COMMAND  Full Claude CLI command override
+  CLAUDE_SKIP_AUTH_CHECK  Skip Claude credential check
+  CLAUDE_CHAT_MODE    Use "cli" or "sdk" (auto default)
   CONTEXT_WINDOW      Set context window size (default: 160000)
 
 Documentation:
