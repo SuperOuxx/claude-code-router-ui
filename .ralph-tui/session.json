@@ -3,10 +3,10 @@
   "sessionId": "cd3a545e-c31e-4d6b-8d97-3f70e2c1f320",
   "status": "running",
   "startedAt": "2026-01-27T13:07:13.209Z",
-  "updatedAt": "2026-01-27T13:57:33.674Z",
-  "currentIteration": 3,
+  "updatedAt": "2026-01-27T14:00:04.303Z",
+  "currentIteration": 4,
   "maxIterations": 10,
-  "tasksCompleted": 3,
+  "tasksCompleted": 4,
   "isPaused": false,
   "agentPlugin": "codex",
   "trackerState": {
@@ -35,8 +35,8 @@
       {
         "id": "US-004",
         "title": "保存前外部改动检测（mtime）与冲突处理（仅保存前）",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "US-005",
@@ -94,6 +94,16 @@
       "durationMs": 66195,
       "startedAt": "2026-01-27T13:38:15.815Z",
       "endedAt": "2026-01-27T13:39:22.010Z"
+    },
+    {
+      "iteration": 4,
+      "status": "completed",
+      "taskId": "US-004",
+      "taskTitle": "保存前外部改动检测（mtime）与冲突处理（仅保存前）",
+      "taskCompleted": true,
+      "durationMs": 1090200,
+      "startedAt": "2026-01-27T13:39:23.461Z",
+      "endedAt": "2026-01-27T13:57:33.661Z"
     }
   ],
   "skippedTaskIds": [],
