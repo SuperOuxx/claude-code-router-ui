@@ -48,6 +48,35 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
     }
   }, [workspacePath]);
 
+  const getStepLabel = (stepNumber) => {
+    switch (stepNumber) {
+      case 1:
+        return t('projectWizard.steps.type');
+      case 2:
+        return t('projectWizard.steps.configure');
+      case 3:
+      default:
+        return t('projectWizard.steps.confirm');
+    }
+  };
+
+  const getBrowseDirectory = (inputPath) => {
+    const lastForwardSlash = inputPath.lastIndexOf('/');
+    const lastBackSlash = inputPath.lastIndexOf('\\');
+    const lastSeparator = Math.max(lastForwardSlash, lastBackSlash);
+
+    if (lastSeparator <= 0) {
+      return '~';
+    }
+
+    // Windows drive roots like "C:\" / "C:/" should browse the root, not "C:"
+    if (lastSeparator === 2 && inputPath[1] === ':') {
+      return inputPath.substring(0, lastSeparator + 1);
+    }
+
+    return inputPath.substring(0, lastSeparator);
+  };
+
   const loadGithubTokens = async () => {
     try {
       setLoadingTokens(true);
@@ -70,17 +99,16 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
 
   const loadPathSuggestions = async (inputPath) => {
     try {
-      // Extract the directory to browse (parent of input)
-      const lastSlash = inputPath.lastIndexOf('/');
-      const dirPath = lastSlash > 0 ? inputPath.substring(0, lastSlash) : '~';
+      const dirPath = getBrowseDirectory(inputPath);
 
       const response = await api.browseFilesystem(dirPath);
       const data = await response.json();
 
       if (data.suggestions) {
+        const inputLower = inputPath.toLowerCase();
         // Filter suggestions based on the input
         const filtered = data.suggestions.filter(s =>
-          s.path.toLowerCase().startsWith(inputPath.toLowerCase())
+          s.path.toLowerCase().startsWith(inputLower)
         );
         setPathSuggestions(filtered.slice(0, 5));
         setShowPathDropdown(filtered.length > 0);
@@ -140,7 +168,11 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || t('projectWizard.errors.failedToCreate'));
+        throw new Error(
+          data.details
+            ? `${data.error || t('projectWizard.errors.failedToCreate')}: ${data.details}`
+            : (data.error || t('projectWizard.errors.failedToCreate'))
+        );
       }
 
       // Success!
@@ -233,7 +265,7 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
                     {s < step ? <Check className="w-4 h-4" /> : s}
                   </div>
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:inline">
-                    {s === 1 ? t('projectWizard.steps.type') : s === 2 ? t('projectWizard.steps.configure') : t('projectWizard.steps.confirm')}
+                    {getStepLabel(s)}
                   </span>
                 </div>
                 {s < 3 && (

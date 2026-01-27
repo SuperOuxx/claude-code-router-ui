@@ -7,28 +7,148 @@ import { addProjectManually } from '../projects.js';
 
 const router = express.Router();
 
-// Configure allowed workspace root (defaults to user's home directory)
-const WORKSPACES_ROOT = process.env.WORKSPACES_ROOT || os.homedir();
+// Configure allowed workspace root(s) (defaults to user's home directory)
+// Accepts multiple roots separated by the OS path delimiter (Windows: ';', POSIX: ':')
+const DEFAULT_WORKSPACES_ROOT = os.homedir();
 
 // System-critical paths that should never be used as workspace directories
-const FORBIDDEN_PATHS = [
-  '/',
-  '/etc',
-  '/bin',
-  '/sbin',
-  '/usr',
-  '/dev',
-  '/proc',
-  '/sys',
-  '/var',
-  '/boot',
-  '/root',
-  '/lib',
-  '/lib64',
-  '/opt',
-  '/tmp',
-  '/run'
-];
+function getForbiddenPaths() {
+  if (process.platform === 'win32') {
+    const forbidden = [];
+    const systemRoot = process.env.SystemRoot;
+    const programFiles = process.env.ProgramFiles;
+    const programFilesX86 = process.env['ProgramFiles(x86)'];
+    const programData = process.env.ProgramData;
+
+    if (systemRoot) forbidden.push(systemRoot);
+    if (programFiles) forbidden.push(programFiles);
+    if (programFilesX86) forbidden.push(programFilesX86);
+    if (programData) forbidden.push(programData);
+
+    // Fallbacks for environments where env vars are missing
+    forbidden.push('C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)', 'C:\\ProgramData');
+
+    return forbidden.map(p => path.normalize(p));
+  }
+
+  return [
+    '/etc',
+    '/bin',
+    '/sbin',
+    '/usr',
+    '/dev',
+    '/proc',
+    '/sys',
+    '/var',
+    '/boot',
+    '/root',
+    '/lib',
+    '/lib64',
+    '/opt',
+    '/tmp',
+    '/run'
+  ].map(p => path.normalize(p));
+}
+
+const FORBIDDEN_PATHS = getForbiddenPaths();
+
+function expandTilde(inputPath) {
+  if (!inputPath) return inputPath;
+  if (inputPath === '~') return os.homedir();
+  if (inputPath.startsWith('~' + path.sep) || inputPath.startsWith('~/')) {
+    return path.join(os.homedir(), inputPath.slice(2));
+  }
+  return inputPath;
+}
+
+function normalizeForComparison(inputPath) {
+  const normalized = path.normalize(inputPath);
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+function isSamePathOrWithin(candidatePath, rootPath) {
+  const candidate = normalizeForComparison(candidatePath);
+  const root = normalizeForComparison(rootPath);
+
+  if (candidate === root) return true;
+  if (!candidate.startsWith(root)) return false;
+
+  const separator = path.sep;
+  if (root.endsWith(separator)) return true;
+  return candidate.startsWith(root + separator);
+}
+
+function parseWorkspaceRoots() {
+  // Don't capture env vars at module init time; `server/index.js` loads `.env`
+  // after static imports are evaluated (ESM import hoisting).
+  const rawRoots = (process.env.WORKSPACES_ROOT || DEFAULT_WORKSPACES_ROOT).trim();
+  const parts = rawRoots
+    .split(path.delimiter)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts : [DEFAULT_WORKSPACES_ROOT];
+}
+
+async function resolvePathAllowingNonexistent(inputPath) {
+  const expanded = expandTilde(inputPath);
+  const absolute = path.resolve(expanded);
+
+  try {
+    await fs.access(absolute);
+    return await fs.realpath(absolute);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  const parentPath = path.dirname(absolute);
+  try {
+    const parentRealPath = await fs.realpath(parentPath);
+    return path.join(parentRealPath, path.basename(absolute));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return absolute;
+    }
+    throw error;
+  }
+}
+
+function getWorkspacePathError(normalizedPath) {
+  if (process.platform === 'win32') {
+    const root = path.parse(normalizedPath).root;
+    if (normalizeForComparison(normalizedPath) === normalizeForComparison(root)) {
+      return 'Cannot use a drive root as a workspace location';
+    }
+  }
+
+  const normalizedComparable = normalizeForComparison(normalizedPath);
+  const isExactForbidden = FORBIDDEN_PATHS.some(
+    (forbidden) => normalizeForComparison(forbidden) === normalizedComparable
+  );
+  if (isExactForbidden || normalizedPath === '/') {
+    return 'Cannot use system-critical directories as workspace locations';
+  }
+
+  for (const forbidden of FORBIDDEN_PATHS) {
+    if (!isSamePathOrWithin(normalizedPath, forbidden)) {
+      continue;
+    }
+
+    // Exception: /var/tmp and similar user-accessible paths might be allowed
+    // but /var itself and most /var subdirectories should be blocked
+    if (forbidden === '/var' &&
+        (normalizedPath.startsWith('/var/tmp') ||
+         normalizedPath.startsWith('/var/folders'))) {
+      continue;
+    }
+
+    return `Cannot create workspace in system directory: ${forbidden}`;
+  }
+
+  return null;
+}
 
 /**
  * Validates that a path is safe for workspace operations
@@ -37,75 +157,33 @@ const FORBIDDEN_PATHS = [
  */
 async function validateWorkspacePath(requestedPath) {
   try {
+    if (!requestedPath || typeof requestedPath !== 'string') {
+      return { valid: false, error: 'Workspace path is required' };
+    }
+
     // Resolve to absolute path
-    let absolutePath = path.resolve(requestedPath);
+    const absolutePath = path.resolve(expandTilde(requestedPath.trim()));
 
-    // Check if path is a forbidden system directory
     const normalizedPath = path.normalize(absolutePath);
-    if (FORBIDDEN_PATHS.includes(normalizedPath) || normalizedPath === '/') {
-      return {
-        valid: false,
-        error: 'Cannot use system-critical directories as workspace locations'
-      };
+    const systemPathError = getWorkspacePathError(normalizedPath);
+    if (systemPathError) {
+      return { valid: false, error: systemPathError };
     }
 
-    // Additional check for paths starting with forbidden directories
-    for (const forbidden of FORBIDDEN_PATHS) {
-      if (normalizedPath === forbidden ||
-          normalizedPath.startsWith(forbidden + path.sep)) {
-        // Exception: /var/tmp and similar user-accessible paths might be allowed
-        // but /var itself and most /var subdirectories should be blocked
-        if (forbidden === '/var' &&
-            (normalizedPath.startsWith('/var/tmp') ||
-             normalizedPath.startsWith('/var/folders'))) {
-          continue; // Allow these specific cases
-        }
-
-        return {
-          valid: false,
-          error: `Cannot create workspace in system directory: ${forbidden}`
-        };
-      }
-    }
-
-    // Try to resolve the real path (following symlinks)
-    let realPath;
-    try {
-      // Check if path exists to resolve real path
-      await fs.access(absolutePath);
-      realPath = await fs.realpath(absolutePath);
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        // Path doesn't exist yet - check parent directory
-        let parentPath = path.dirname(absolutePath);
-        try {
-          const parentRealPath = await fs.realpath(parentPath);
-
-          // Reconstruct the full path with real parent
-          realPath = path.join(parentRealPath, path.basename(absolutePath));
-        } catch (parentError) {
-          if (parentError.code === 'ENOENT') {
-            // Parent doesn't exist either - use the absolute path as-is
-            // We'll validate it's within allowed root
-            realPath = absolutePath;
-          } else {
-            throw parentError;
-          }
-        }
-      } else {
-        throw error;
-      }
-    }
+    const realPath = await resolvePathAllowingNonexistent(absolutePath);
 
     // Resolve the workspace root to its real path
-    const resolvedWorkspaceRoot = await fs.realpath(WORKSPACES_ROOT);
+    const workspaceRoots = parseWorkspaceRoots();
+    const resolvedWorkspaceRoots = await Promise.all(
+      workspaceRoots.map(resolvePathAllowingNonexistent)
+    );
 
     // Ensure the resolved path is contained within the allowed workspace root
-    if (!realPath.startsWith(resolvedWorkspaceRoot + path.sep) &&
-        realPath !== resolvedWorkspaceRoot) {
+    const isAllowed = resolvedWorkspaceRoots.some(root => isSamePathOrWithin(realPath, root));
+    if (!isAllowed) {
       return {
         valid: false,
-        error: `Workspace path must be within the allowed workspace root: ${WORKSPACES_ROOT}`
+        error: `Workspace path must be within the allowed workspace root: ${workspaceRoots.join(path.delimiter)}`
       };
     }
 
@@ -120,8 +198,8 @@ async function validateWorkspacePath(requestedPath) {
         const resolvedTarget = path.resolve(path.dirname(absolutePath), linkTarget);
         const realTarget = await fs.realpath(resolvedTarget);
 
-        if (!realTarget.startsWith(resolvedWorkspaceRoot + path.sep) &&
-            realTarget !== resolvedWorkspaceRoot) {
+        const isTargetAllowed = resolvedWorkspaceRoots.some(root => isSamePathOrWithin(realTarget, root));
+        if (!isTargetAllowed) {
           return {
             valid: false,
             error: 'Symlink target is outside the allowed workspace root'

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Load environment variables from .env file
+// Load environment variables from .env file (must run before other imports)
+import './load-env.js';
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,22 +30,6 @@ const c = {
     dim: (text) => `${colors.dim}${text}${colors.reset}`,
 };
 
-try {
-    const envPath = path.join(__dirname, '../.env');
-    const envFile = fs.readFileSync(envPath, 'utf8');
-    envFile.split('\n').forEach(line => {
-        const trimmedLine = line.trim();
-        if (trimmedLine && !trimmedLine.startsWith('#')) {
-            const [key, ...valueParts] = trimmedLine.split('=');
-            if (key && valueParts.length > 0 && !process.env[key]) {
-                process.env[key] = valueParts.join('=').trim();
-            }
-        }
-    });
-} catch (e) {
-    console.log('No .env file found or error reading it:', e.message);
-}
-
 console.log('PORT from env:', process.env.PORT);
 
 import express from 'express';
@@ -62,7 +48,7 @@ import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getAct
 import { queryClaudeCLI, abortClaudeCLISession, isClaudeCLISessionActive, getActiveClaudeCLISessions } from './claude-cli.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from './cursor-cli.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from './openai-codex.js';
-import { formatBashInvocation, formatPowerShellInvocation, getClaudeCliTokens } from './utils/claudeCli.js';
+import { formatBashInvocation, formatPowerShellInvocation, getClaudeCliTokens, shouldUseClaudeCliChat } from './utils/claudeCli.js';
 import gitRoutes from './routes/git.js';
 import authRoutes from './routes/auth.js';
 import mcpRoutes from './routes/mcp.js';
@@ -783,15 +769,6 @@ function handleChatConnection(ws) {
 
     // Wrap WebSocket with writer for consistent interface with SSEStreamWriter
     const writer = new WebSocketWriter(ws);
-
-    const shouldUseClaudeCliChat = () => {
-        const chatMode = (process.env.CLAUDE_CHAT_MODE || '').trim().toLowerCase();
-        if (chatMode === 'cli') return true;
-        if (chatMode === 'sdk') return false;
-
-        const cliTokens = getClaudeCliTokens();
-        return Boolean(cliTokens[0] && /(?:^|[\\/])ccr(?:\\.exe)?$/i.test(cliTokens[0]));
-    };
 
     ws.on('message', async (message) => {
         try {
@@ -1774,10 +1751,7 @@ async function startServer() {
         const isProduction = fs.existsSync(distIndexPath);
 
         // Log Claude implementation mode
-        const chatMode = (process.env.CLAUDE_CHAT_MODE || '').trim().toLowerCase();
-        const cliTokens = getClaudeCliTokens();
-        const inferredCli = cliTokens[0] && /(?:^|[\\/])ccr(?:\\.exe)?$/i.test(cliTokens[0]);
-        const shouldUseCli = chatMode === 'cli' || (chatMode !== 'sdk' && inferredCli);
+        const shouldUseCli = shouldUseClaudeCliChat();
         console.log(`${c.info('[INFO]')} Claude integration: ${c.bright(shouldUseCli ? 'CLI' : 'Agents SDK')}`);
         console.log(`${c.info('[INFO]')} Running in ${c.bright(isProduction ? 'PRODUCTION' : 'DEVELOPMENT')} mode`);
 
