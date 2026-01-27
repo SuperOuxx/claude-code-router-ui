@@ -3,10 +3,10 @@
   "sessionId": "cd3a545e-c31e-4d6b-8d97-3f70e2c1f320",
   "status": "running",
   "startedAt": "2026-01-27T13:07:13.209Z",
-  "updatedAt": "2026-01-27T14:00:04.303Z",
-  "currentIteration": 4,
+  "updatedAt": "2026-01-27T14:11:20.448Z",
+  "currentIteration": 5,
   "maxIterations": 10,
-  "tasksCompleted": 4,
+  "tasksCompleted": 5,
   "isPaused": false,
   "agentPlugin": "codex",
   "trackerState": {
@@ -41,8 +41,8 @@
       {
         "id": "US-005",
         "title": "粘贴/拖拽文件落盘到同目录 `assets/` 并插入引用",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "US-006",
@@ -104,6 +104,16 @@
       "durationMs": 1090200,
       "startedAt": "2026-01-27T13:39:23.461Z",
       "endedAt": "2026-01-27T13:57:33.661Z"
+    },
+    {
+      "iteration": 5,
+      "status": "completed",
+      "taskId": "US-005",
+      "taskTitle": "粘贴/拖拽文件落盘到同目录 `assets/` 并插入引用",
+      "taskCompleted": true,
+      "durationMs": 149192,
+      "startedAt": "2026-01-27T13:57:35.099Z",
+      "endedAt": "2026-01-27T14:00:04.291Z"
     }
   ],
   "skippedTaskIds": [],
