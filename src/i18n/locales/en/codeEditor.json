@@ -22,9 +22,26 @@
     "fullscreen": "Fullscreen",
     "close": "Close"
   },
+  "markdown": {
+    "plainText": "Plain text",
+    "switchToPlainText": "Switch to plain text",
+    "openWithVditor": "Open with Vditor",
+    "vditorLoadFailed": "Vditor failed to load (switched to plain text): {{error}}"
+  },
   "footer": {
     "lines": "Lines:",
     "characters": "Characters:",
     "shortcuts": "Press Ctrl+S to save • Esc to close"
+  },
+  "conflict": {
+    "title": "File changed on disk",
+    "message": "This file was modified on disk since you opened it. Choose how to resolve the conflict before saving.",
+    "reload": "Reload from disk",
+    "overwrite": "Overwrite on disk",
+    "cancel": "Cancel",
+    "reloadWarning": "Reloading may discard your local unsaved changes and load the disk version.",
+    "overwriteWarning": "Overwriting will replace the disk version with your current edits.",
+    "autosaveSkippedTitle": "Autosave skipped",
+    "autosaveSkippedBody": "The file changed on disk. Autosave was stopped to avoid overwriting it. Use Save to resolve."
   }
 }

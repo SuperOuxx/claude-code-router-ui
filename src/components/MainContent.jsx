@@ -67,6 +67,7 @@ function MainContent({
   const [isResizing, setIsResizing] = useState(false);
   const [editorExpanded, setEditorExpanded] = useState(false);
   const resizeRef = useRef(null);
+  const codeEditorRef = useRef(null);
   
   // PRD Editor state
   const [showPRDEditor, setShowPRDEditor] = useState(false);
@@ -120,15 +121,25 @@ function MainContent({
     loadExistingPRDs();
   }, [currentProject?.name]);
 
-  const handleFileOpen = (filePath, diffInfo = null) => {
+  const handleFileOpen = async (filePath, diffInfo = null) => {
     // Create a file object that CodeEditor expects
-    const file = {
+    const nextFile = {
       name: filePath.split('/').pop(),
       path: filePath,
       projectName: selectedProject?.name,
       diffInfo: diffInfo // Pass along diff information if available
     };
-    setEditingFile(file);
+
+    if (editingFile?.projectName === nextFile.projectName && editingFile?.path === nextFile.path) {
+      return;
+    }
+
+    if (editingFile && codeEditorRef.current?.prepareForSwitch) {
+      const ok = await codeEditorRef.current.prepareForSwitch();
+      if (!ok) return;
+    }
+
+    setEditingFile(nextFile);
   };
 
   const handleCloseEditor = () => {
@@ -601,6 +612,7 @@ function MainContent({
               style={editorExpanded ? {} : { width: `${editorWidth}px` }}
             >
               <CodeEditor
+                ref={codeEditorRef}
                 file={editingFile}
                 onClose={handleCloseEditor}
                 projectPath={selectedProject?.path}
@@ -616,6 +628,7 @@ function MainContent({
       {/* Code Editor Modal for Mobile */}
       {editingFile && isMobile && (
         <CodeEditor
+          ref={codeEditorRef}
           file={editingFile}
           onClose={handleCloseEditor}
           projectPath={selectedProject?.path}

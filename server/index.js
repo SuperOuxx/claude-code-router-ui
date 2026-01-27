@@ -42,6 +42,7 @@ import { spawn } from 'child_process';
 import pty from 'node-pty';
 import fetch from 'node-fetch';
 import mime from 'mime-types';
+import multer from 'multer';
 
 import { getProjects, getSessions, getSessionMessages, renameProject, deleteSession, deleteProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache } from './projects.js';
 import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getActiveClaudeSDKSessions, resolveToolApproval } from './claude-sdk.js';
@@ -49,6 +50,7 @@ import { queryClaudeCLI, abortClaudeCLISession, isClaudeCLISessionActive, getAct
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from './cursor-cli.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from './openai-codex.js';
 import { formatBashInvocation, formatPowerShellInvocation, getClaudeCliTokens, shouldUseClaudeCliChat } from './utils/claudeCli.js';
+import { SafeWriteError, writeAssetFile, writeMarkdownFile } from './utils/safeFileWrite.js';
 import gitRoutes from './routes/git.js';
 import authRoutes from './routes/auth.js';
 import mcpRoutes from './routes/mcp.js';
@@ -565,8 +567,16 @@ app.get('/api/projects/:projectName/file', authenticateToken, async (req, res) =
             return res.status(403).json({ error: 'Path must be under project root' });
         }
 
-        const content = await fsPromises.readFile(resolved, 'utf8');
-        res.json({ content, path: resolved });
+        const [content, stats] = await Promise.all([
+            fsPromises.readFile(resolved, 'utf8'),
+            fsPromises.stat(resolved)
+        ]);
+        res.json({
+            content,
+            path: resolved,
+            mtimeMs: stats.mtimeMs,
+            mtime: stats.mtime.toISOString()
+        });
     } catch (error) {
         console.error('Error reading file:', error);
         if (error.code === 'ENOENT') {
@@ -637,7 +647,7 @@ app.get('/api/projects/:projectName/files/content', authenticateToken, async (re
 app.put('/api/projects/:projectName/file', authenticateToken, async (req, res) => {
     try {
         const { projectName } = req.params;
-        const { filePath, content } = req.body;
+        const { filePath, content, expectedMtimeMs, force } = req.body;
 
         console.log('[DEBUG] File save request:', projectName, filePath);
 
@@ -664,13 +674,33 @@ app.put('/api/projects/:projectName/file', authenticateToken, async (req, res) =
             return res.status(403).json({ error: 'Path must be under project root' });
         }
 
+        // Optional optimistic concurrency check (mtime-based). Only enforced if expectedMtimeMs is provided.
+        if (expectedMtimeMs !== undefined && expectedMtimeMs !== null && !force) {
+            const currentStats = await fsPromises.stat(resolved);
+            const drift = Math.abs(Number(currentStats.mtimeMs) - Number(expectedMtimeMs));
+            // Allow tiny filesystem timestamp drift; anything larger is treated as an external modification.
+            if (Number.isFinite(drift) && drift > 2) {
+                const currentContent = await fsPromises.readFile(resolved, 'utf8');
+                return res.status(409).json({
+                    error: 'File modified externally',
+                    path: resolved,
+                    mtimeMs: currentStats.mtimeMs,
+                    mtime: currentStats.mtime.toISOString(),
+                    content: currentContent
+                });
+            }
+        }
+
         // Write the new content
         await fsPromises.writeFile(resolved, content, 'utf8');
+        const stats = await fsPromises.stat(resolved);
 
         res.json({
             success: true,
             path: resolved,
-            message: 'File saved successfully'
+            message: 'File saved successfully',
+            mtimeMs: stats.mtimeMs,
+            mtime: stats.mtime.toISOString()
         });
     } catch (error) {
         console.error('Error saving file:', error);
@@ -681,6 +711,149 @@ app.put('/api/projects/:projectName/file', authenticateToken, async (req, res) =
         } else {
             res.status(500).json({ error: error.message });
         }
+    }
+});
+
+// Safe markdown write endpoint (.md only; auto mkdir; conflictStrategy: overwrite|error|rename)
+app.post('/api/projects/:projectName/write-markdown', authenticateToken, async (req, res) => {
+    try {
+        const { projectName } = req.params;
+        const { relativePath, content, conflictStrategy } = req.body || {};
+
+        const projectRoot = await extractProjectDirectory(projectName).catch(() => null);
+        if (!projectRoot) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const result = await writeMarkdownFile(projectRoot, { relativePath, content, conflictStrategy });
+        return res.json({ success: true, relativePath: result.relativePath });
+    } catch (error) {
+        if (error instanceof SafeWriteError) {
+            return res.status(error.status).json({ error: error.error, message: error.message, details: error.details });
+        }
+        console.error('Error writing markdown:', error);
+        if (error?.code === 'EACCES') return res.status(403).json({ error: 'Permission denied' });
+        if (error?.code === 'ENOENT') return res.status(404).json({ error: 'File or directory not found' });
+        if (error?.code === 'ENOSPC') return res.status(507).json({ error: 'No space left on device' });
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// Safe asset write endpoint (writes under assets/; auto mkdir; conflictStrategy: overwrite|error|rename)
+app.post('/api/projects/:projectName/write-asset', authenticateToken, async (req, res) => {
+    try {
+        const { projectName } = req.params;
+        const { fileName, subdir, dataUrl, base64, mimeType, conflictStrategy } = req.body || {};
+
+        const projectRoot = await extractProjectDirectory(projectName).catch(() => null);
+        if (!projectRoot) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const result = await writeAssetFile(projectRoot, { fileName, subdir, dataUrl, base64, mimeType, conflictStrategy });
+        return res.json({ success: true, relativePath: result.relativePath, mimeType: result.mimeType, bytes: result.bytes });
+    } catch (error) {
+        if (error instanceof SafeWriteError) {
+            return res.status(error.status).json({ error: error.error, message: error.message, details: error.details });
+        }
+        console.error('Error writing asset:', error);
+        if (error?.code === 'EACCES') return res.status(403).json({ error: 'Permission denied' });
+        if (error?.code === 'ENOENT') return res.status(404).json({ error: 'File or directory not found' });
+        if (error?.code === 'ENOSPC') return res.status(507).json({ error: 'No space left on device' });
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+// Upload assets for a markdown file. Saves into a sibling `assets/` directory and returns relative paths.
+app.post('/api/projects/:projectName/assets', authenticateToken, async (req, res) => {
+    try {
+        const { projectName } = req.params;
+
+        const upload = multer({
+            storage: multer.memoryStorage(),
+            limits: {
+                files: 10,
+                fileSize: 25 * 1024 * 1024 // 25MB per file
+            }
+        });
+
+        upload.array('files', 10)(req, res, async (err) => {
+            if (err) {
+                console.error('Asset upload error:', err);
+                return res.status(400).json({ error: err.message || 'Upload failed' });
+            }
+
+            const markdownFilePath = req.body?.markdownFilePath;
+            if (!markdownFilePath) {
+                return res.status(400).json({ error: 'markdownFilePath is required' });
+            }
+
+            const projectRoot = await extractProjectDirectory(projectName).catch(() => null);
+            if (!projectRoot) {
+                return res.status(404).json({ error: 'Project not found' });
+            }
+
+            const resolvedMarkdown = path.isAbsolute(markdownFilePath)
+                ? path.resolve(markdownFilePath)
+                : path.resolve(projectRoot, markdownFilePath);
+            const normalizedRoot = path.resolve(projectRoot) + path.sep;
+            if (!resolvedMarkdown.startsWith(normalizedRoot)) {
+                return res.status(403).json({ error: 'Path must be under project root' });
+            }
+
+            const mdDir = path.dirname(resolvedMarkdown);
+            const assetsDir = path.join(mdDir, 'assets');
+            await fsPromises.mkdir(assetsDir, { recursive: true });
+
+            const files = Array.isArray(req.files) ? req.files : [];
+            if (files.length === 0) {
+                return res.status(400).json({ error: 'No files uploaded' });
+            }
+
+            const ensureUniqueName = async (dir, baseName) => {
+                const parsed = path.parse(baseName);
+                const safeBase = (parsed.name || 'asset').replace(/[<>:"/\\\\|?*]/g, '_');
+                const safeExt = (parsed.ext || '').replace(/[<>:"/\\\\|?*]/g, '');
+
+                let candidate = `${safeBase}${safeExt}`;
+                let counter = 1;
+                while (true) {
+                    const candidatePath = path.join(dir, candidate);
+                    try {
+                        await fsPromises.access(candidatePath);
+                        candidate = `${safeBase}-${counter}${safeExt}`;
+                        counter += 1;
+                    } catch (e) {
+                        if (e.code === 'ENOENT') return candidate;
+                        throw e;
+                    }
+                }
+            };
+
+            const saved = [];
+            for (const f of files) {
+                const originalName = String(f.originalname || 'asset');
+                const safeName = await ensureUniqueName(assetsDir, path.basename(originalName));
+                const destPath = path.join(assetsDir, safeName);
+
+                await fsPromises.writeFile(destPath, f.buffer);
+
+                saved.push({
+                    originalName,
+                    fileName: safeName,
+                    absolutePath: destPath,
+                    relativePath: path.join('assets', safeName).replace(/\\\\/g, '/')
+                });
+            }
+
+            return res.json({
+                success: true,
+                files: saved
+            });
+        });
+    } catch (error) {
+        console.error('Error uploading assets:', error);
+        res.status(500).json({ error: error.message || 'Failed to upload assets' });
     }
 });
 

@@ -46,7 +46,7 @@ export const api = {
   // config endpoint removed - no longer needed (frontend uses window.location)
   projects: () => authenticatedFetch('/api/projects'),
   sessions: (projectName, limit = 5, offset = 0) => 
-    authenticatedFetch(`/api/projects/${projectName}/sessions?limit=${limit}&offset=${offset}`),
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/sessions?limit=${limit}&offset=${offset}`),
   sessionMessages: (projectName, sessionId, limit = null, offset = 0, provider = 'claude') => {
     const params = new URLSearchParams();
     if (limit !== null) {
@@ -62,17 +62,17 @@ export const api = {
     } else if (provider === 'cursor') {
       url = `/api/cursor/sessions/${sessionId}/messages${queryString ? `?${queryString}` : ''}`;
     } else {
-      url = `/api/projects/${projectName}/sessions/${sessionId}/messages${queryString ? `?${queryString}` : ''}`;
+      url = `/api/projects/${encodeURIComponent(projectName)}/sessions/${sessionId}/messages${queryString ? `?${queryString}` : ''}`;
     }
     return authenticatedFetch(url);
   },
   renameProject: (projectName, displayName) =>
-    authenticatedFetch(`/api/projects/${projectName}/rename`, {
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/rename`, {
       method: 'PUT',
       body: JSON.stringify({ displayName }),
     }),
   deleteSession: (projectName, sessionId) =>
-    authenticatedFetch(`/api/projects/${projectName}/sessions/${sessionId}`, {
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/sessions/${sessionId}`, {
       method: 'DELETE',
     }),
   deleteCodexSession: (sessionId) =>
@@ -80,7 +80,7 @@ export const api = {
       method: 'DELETE',
     }),
   deleteProject: (projectName, force = false) =>
-    authenticatedFetch(`/api/projects/${projectName}${force ? '?force=true' : ''}`, {
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}${force ? '?force=true' : ''}`, {
       method: 'DELETE',
     }),
   createProject: (path) =>
@@ -94,14 +94,40 @@ export const api = {
       body: JSON.stringify(workspaceData),
     }),
   readFile: (projectName, filePath) =>
-    authenticatedFetch(`/api/projects/${projectName}/file?filePath=${encodeURIComponent(filePath)}`),
-  saveFile: (projectName, filePath, content) =>
-    authenticatedFetch(`/api/projects/${projectName}/file`, {
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/file?filePath=${encodeURIComponent(filePath)}`),
+  saveFile: (projectName, filePath, content, options = {}) =>
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/file`, {
       method: 'PUT',
-      body: JSON.stringify({ filePath, content }),
+      body: JSON.stringify({
+        filePath,
+        content,
+        expectedMtimeMs: options.expectedMtimeMs,
+        force: options.force,
+      }),
+    }),
+  uploadMarkdownAssets: (projectName, markdownFilePath, files) => {
+    const formData = new FormData();
+    formData.append('markdownFilePath', markdownFilePath);
+    Array.from(files || []).forEach((f) => formData.append('files', f));
+
+    return authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/assets`, {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set Content-Type for FormData
+    });
+  },
+  writeMarkdown: (projectName, relativePath, content, options = {}) =>
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/write-markdown`, {
+      method: 'POST',
+      body: JSON.stringify({ relativePath, content, ...options }),
+    }),
+  writeAsset: (projectName, asset) =>
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/write-asset`, {
+      method: 'POST',
+      body: JSON.stringify(asset),
     }),
   getFiles: (projectName) =>
-    authenticatedFetch(`/api/projects/${projectName}/files`),
+    authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/files`),
   transcribe: (formData) =>
     authenticatedFetch('/api/transcribe', {
       method: 'POST',

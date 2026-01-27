@@ -1,0 +1,564 @@
+diff --git a/server/index.js b/server/index.js
+index 0000000..0000000 100644
+--- a/server/index.js
++++ b/server/index.js
+@@
+ // Read file content endpoint
+ app.get('/api/projects/:projectName/file', authenticateToken, async (req, res) => {
+     try {
+         const { projectName } = req.params;
+         const { filePath } = req.query;
+@@
+-        const content = await fsPromises.readFile(resolved, 'utf8');
+-        res.json({ content, path: resolved });
++        const [content, stats] = await Promise.all([
++            fsPromises.readFile(resolved, 'utf8'),
++            fsPromises.stat(resolved)
++        ]);
++        res.json({ content, path: resolved, mtimeMs: Math.trunc(stats.mtimeMs) });
+     } catch (error) {
+         console.error('Error reading file:', error);
+         if (error.code === 'ENOENT') {
+             res.status(404).json({ error: 'File not found' });
+@@
+ // Save file content endpoint
+ app.put('/api/projects/:projectName/file', authenticateToken, async (req, res) => {
+     try {
+         const { projectName } = req.params;
+-        const { filePath, content } = req.body;
++        const { filePath, content, expectedMtimeMs, force } = req.body;
+@@
+         if (!resolved.startsWith(normalizedRoot)) {
+             return res.status(403).json({ error: 'Path must be under project root' });
+         }
+ 
++        if (!force && expectedMtimeMs !== undefined && expectedMtimeMs !== null) {
++            let diskStats;
++            try {
++                diskStats = await fsPromises.stat(resolved);
++            } catch (statError) {
++                if (statError.code === 'ENOENT') {
++                    return res.status(409).json({
++                        error: 'FILE_MISSING',
++                        message: 'File no longer exists on disk'
++                    });
++                }
++                throw statError;
++            }
++
++            if (Math.trunc(diskStats.mtimeMs) !== Math.trunc(expectedMtimeMs)) {
++                return res.status(409).json({
++                    error: 'FILE_CONFLICT',
++                    message: 'File has changed on disk',
++                    diskMtimeMs: Math.trunc(diskStats.mtimeMs)
++                });
++            }
++        }
++
+         // Write the new content
+         await fsPromises.writeFile(resolved, content, 'utf8');
++        const stats = await fsPromises.stat(resolved);
+ 
+         res.json({
+             success: true,
+             path: resolved,
+-            message: 'File saved successfully'
++            message: 'File saved successfully',
++            mtimeMs: Math.trunc(stats.mtimeMs)
+         });
+     } catch (error) {
+         console.error('Error saving file:', error);
+         if (error.code === 'ENOENT') {
+             res.status(404).json({ error: 'File or directory not found' });
+diff --git a/src/utils/api.js b/src/utils/api.js
+index 0000000..0000000 100644
+--- a/src/utils/api.js
++++ b/src/utils/api.js
+@@
+   readFile: (projectName, filePath) =>
+     authenticatedFetch(`/api/projects/${projectName}/file?filePath=${encodeURIComponent(filePath)}`),
+-  saveFile: (projectName, filePath, content) =>
++  saveFile: (projectName, filePath, content, options = {}) =>
+     authenticatedFetch(`/api/projects/${projectName}/file`, {
+       method: 'PUT',
+-      body: JSON.stringify({ filePath, content }),
++      body: JSON.stringify({
++        filePath,
++        content,
++        expectedMtimeMs: options.expectedMtimeMs,
++        force: options.force,
++      }),
+     }),
+diff --git a/src/components/MainContent.jsx b/src/components/MainContent.jsx
+index 0000000..0000000 100644
+--- a/src/components/MainContent.jsx
++++ b/src/components/MainContent.jsx
+@@
+   const [editorWidth, setEditorWidth] = useState(600);
+   const [isResizing, setIsResizing] = useState(false);
+   const [editorExpanded, setEditorExpanded] = useState(false);
+   const resizeRef = useRef(null);
++  const codeEditorRef = useRef(null);
+@@
+-  const handleFileOpen = (filePath, diffInfo = null) => {
++  const handleFileOpen = async (filePath, diffInfo = null) => {
+     // Create a file object that CodeEditor expects
+-    const file = {
++    const nextFile = {
+       name: filePath.split('/').pop(),
+       path: filePath,
+       projectName: selectedProject?.name,
+       diffInfo: diffInfo // Pass along diff information if available
+     };
+-    setEditingFile(file);
++
++    if (editingFile?.projectName === nextFile.projectName && editingFile?.path === nextFile.path) {
++      return;
++    }
++
++    if (editingFile && codeEditorRef.current?.prepareForSwitch) {
++      const ok = await codeEditorRef.current.prepareForSwitch();
++      if (!ok) return;
++    }
++
++    setEditingFile(nextFile);
+   };
+@@
+               <CodeEditor
++                ref={codeEditorRef}
+                 file={editingFile}
+                 onClose={handleCloseEditor}
+                 projectPath={selectedProject?.path}
+                 isSidebar={true}
+                 isExpanded={editorExpanded}
+                 onToggleExpand={handleToggleEditorExpand}
+               />
+@@
+       {editingFile && isMobile && (
+         <CodeEditor
++          ref={codeEditorRef}
+           file={editingFile}
+           onClose={handleCloseEditor}
+           projectPath={selectedProject?.path}
+           isSidebar={false}
+         />
+       )}
+diff --git a/src/components/CodeEditor.jsx b/src/components/CodeEditor.jsx
+index 0000000..0000000 100644
+--- a/src/components/CodeEditor.jsx
++++ b/src/components/CodeEditor.jsx
+@@
+-import React, { useState, useEffect, useRef, useMemo } from 'react';
++import React, { useState, useEffect, useRef, useMemo, useImperativeHandle } from 'react';
+ import CodeMirror from '@uiw/react-codemirror';
+@@
+ import { unifiedMergeView, getChunks } from '@codemirror/merge';
+ import { showMinimap } from '@replit/codemirror-minimap';
+-import { X, Save, Download, Maximize2, Minimize2 } from 'lucide-react';
++import { X, Save, Download, Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
+ import { api } from '../utils/api';
+ import { useTranslation } from 'react-i18next';
+ 
+-function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded = false, onToggleExpand = null }) {
++const CodeEditor = React.forwardRef(function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded = false, onToggleExpand = null }, ref) {
+   const { t } = useTranslation('codeEditor');
+   const [content, setContent] = useState('');
++  const [dirty, setDirty] = useState(false);
++  const [baselineMtimeMs, setBaselineMtimeMs] = useState(null);
+   const [loading, setLoading] = useState(true);
+   const [saving, setSaving] = useState(false);
+@@
+   const [saveSuccess, setSaveSuccess] = useState(false);
+   const [showDiff, setShowDiff] = useState(!!file.diffInfo);
++  const [autoSaveBlocked, setAutoSaveBlocked] = useState(false);
++  const [showAutoSaveNotice, setShowAutoSaveNotice] = useState(false);
++  const [conflictDialog, setConflictDialog] = useState(null); // { resolve }
+   const [wordWrap, setWordWrap] = useState(() => {
+     return localStorage.getItem('codeEditorWordWrap') === 'true';
+   });
+@@
+   const [fontSize, setFontSize] = useState(() => {
+     return localStorage.getItem('codeEditorFontSize') || '14';
+   });
+   const editorRef = useRef(null);
++  const autosaveTimerRef = useRef(null);
++
++  useEffect(() => {
++    setShowDiff(!!file.diffInfo);
++  }, [file.diffInfo]);
++
++  const promptConflictResolution = () =>
++    new Promise((resolve) => setConflictDialog({ resolve }));
++
++  const resolveConflictDialog = (choice) => {
++    conflictDialog?.resolve(choice);
++    setConflictDialog(null);
++  };
+@@
+   // Load file content
+   useEffect(() => {
+     const loadFileContent = async () => {
+       try {
+         setLoading(true);
++        setDirty(false);
++        setAutoSaveBlocked(false);
++        setShowAutoSaveNotice(false);
+ 
+         // If we have diffInfo with both old and new content, we can show the diff directly
+         // This handles both GitPanel (full content) and ChatInterface (full content from API)
+         if (file.diffInfo && file.diffInfo.new_string !== undefined && file.diffInfo.old_string !== undefined) {
+           // Use the new_string as the content to display
+           // The unifiedMergeView will compare it against old_string
+           setContent(file.diffInfo.new_string);
++          const statResponse = await api.readFile(file.projectName, file.path);
++          if (statResponse.ok) {
++            const statData = await statResponse.json();
++            setBaselineMtimeMs(statData.mtimeMs ?? null);
++          } else {
++            setBaselineMtimeMs(null);
++          }
+           setLoading(false);
+           return;
+         }
+ 
+         // Otherwise, load from disk
+         const response = await api.readFile(file.projectName, file.path);
+@@
+         const data = await response.json();
+         setContent(data.content);
++        setBaselineMtimeMs(data.mtimeMs ?? null);
+       } catch (error) {
+         console.error('Error loading file:', error);
+         setContent(`// Error loading file: ${error.message}\n// File: ${file.name}\n// Path: ${file.path}`);
++        setBaselineMtimeMs(null);
+       } finally {
+         setLoading(false);
+       }
+     };
+ 
+     loadFileContent();
+   }, [file, projectPath]);
+ 
+-  const handleSave = async () => {
+-    setSaving(true);
+-    try {
+-      console.log('Saving file:', {
+-        projectName: file.projectName,
+-        path: file.path,
+-        contentLength: content?.length
+-      });
+-
+-      const response = await api.saveFile(file.projectName, file.path, content);
+-
+-      console.log('Save response:', {
+-        status: response.status,
+-        ok: response.ok,
+-        contentType: response.headers.get('content-type')
+-      });
+-
+-      if (!response.ok) {
+-        const contentType = response.headers.get('content-type');
+-        if (contentType && contentType.includes('application/json')) {
+-          const errorData = await response.json();
+-          throw new Error(errorData.error || `Save failed: ${response.status}`);
+-        } else {
+-          const textError = await response.text();
+-          console.error('Non-JSON error response:', textError);
+-          throw new Error(`Save failed: ${response.status} ${response.statusText}`);
+-        }
+-      }
+-
+-      const result = await response.json();
+-      console.log('Save successful:', result);
+-
+-      setSaveSuccess(true);
+-      setTimeout(() => setSaveSuccess(false), 2000);
+-
+-    } catch (error) {
+-      console.error('Error saving file:', error);
+-      alert(`Error saving file: ${error.message}`);
+-    } finally {
+-      setSaving(false);
+-    }
+-  };
++  const reloadFromDisk = async () => {
++    try {
++      setLoading(true);
++      const response = await api.readFile(file.projectName, file.path);
++      if (!response.ok) {
++        throw new Error(`Failed to reload file: ${response.status} ${response.statusText}`);
++      }
++      const data = await response.json();
++      setContent(data.content);
++      setBaselineMtimeMs(data.mtimeMs ?? null);
++      setDirty(false);
++      setAutoSaveBlocked(false);
++      setShowAutoSaveNotice(false);
++      return true;
++    } catch (error) {
++      console.error('Error reloading file:', error);
++      alert(`Error reloading file: ${error.message}`);
++      return false;
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  const saveToDisk = async ({ force = false, showSuccessFeedback = true } = {}) => {
++    const response = await api.saveFile(file.projectName, file.path, content, {
++      expectedMtimeMs: baselineMtimeMs,
++      force,
++    });
++
++    if (response.status === 409) {
++      const errorData = await response.json().catch(() => ({}));
++      return { conflict: true, ...errorData };
++    }
++
++    if (!response.ok) {
++      const contentType = response.headers.get('content-type');
++      if (contentType && contentType.includes('application/json')) {
++        const errorData = await response.json();
++        throw new Error(errorData.error || `Save failed: ${response.status}`);
++      }
++      const textError = await response.text();
++      console.error('Non-JSON error response:', textError);
++      throw new Error(`Save failed: ${response.status} ${response.statusText}`);
++    }
++
++    const result = await response.json();
++    setBaselineMtimeMs(result.mtimeMs ?? baselineMtimeMs);
++    setDirty(false);
++    setAutoSaveBlocked(false);
++    setShowAutoSaveNotice(false);
++
++    if (showSuccessFeedback) {
++      setSaveSuccess(true);
++      setTimeout(() => setSaveSuccess(false), 2000);
++    }
++
++    return { success: true };
++  };
++
++  const saveWithConflictHandling = async (trigger) => {
++    if (!dirty) return true;
++    if (saving) return false;
++
++    setSaving(true);
++    let saveResult;
++    try {
++      saveResult = await saveToDisk({ force: false, showSuccessFeedback: trigger === 'manual' });
++    } catch (error) {
++      console.error('Error saving file:', error);
++      alert(`Error saving file: ${error.message}`);
++      setSaving(false);
++      return false;
++    }
++    setSaving(false);
++
++    if (!saveResult?.conflict) return true;
++
++    // Autosave: non-blocking notice only; stop this autosave
++    if (trigger === 'auto') {
++      setAutoSaveBlocked(true);
++      setShowAutoSaveNotice(true);
++      return false;
++    }
++
++    const choice = await promptConflictResolution();
++
++    if (choice === 'reload') {
++      await reloadFromDisk();
++      return true;
++    }
++
++    if (choice === 'overwrite') {
++      setSaving(true);
++      try {
++        await saveToDisk({ force: true, showSuccessFeedback: trigger === 'manual' });
++        return true;
++      } catch (error) {
++        console.error('Error overwriting file:', error);
++        alert(`Error overwriting file: ${error.message}`);
++        return false;
++      } finally {
++        setSaving(false);
++      }
++    }
++
++    // cancel: do not write, keep dirty/content
++    return false;
++  };
++
++  const handleSave = async () => {
++    await saveWithConflictHandling('manual');
++  };
++
++  const handleRequestClose = async () => {
++    if (!dirty) return onClose();
++    const ok = await saveWithConflictHandling('close');
++    if (ok) onClose();
++  };
++
++  useImperativeHandle(ref, () => ({
++    prepareForSwitch: async () => {
++      if (!dirty) return true;
++      return await saveWithConflictHandling('switch');
++    },
++    hasUnsavedChanges: () => dirty,
++  }));
+@@
+   // Handle keyboard shortcuts
+   useEffect(() => {
+     const handleKeyDown = (e) => {
+       if (e.ctrlKey || e.metaKey) {
+         if (e.key === 's') {
+           e.preventDefault();
+           handleSave();
+         } else if (e.key === 'Escape') {
+           e.preventDefault();
+-          onClose();
++          handleRequestClose();
+         }
+       }
+     };
+ 
+     document.addEventListener('keydown', handleKeyDown);
+     return () => document.removeEventListener('keydown', handleKeyDown);
+-  }, [content]);
++  }, [content, dirty, saving]);
++
++  // Debounced autosave (no modal on conflict)
++  useEffect(() => {
++    if (!dirty) return;
++    if (saving) return;
++    if (autoSaveBlocked) return;
++    if (file.diffInfo) return; // avoid autosaving diff-based suggested content
++    if (baselineMtimeMs === null) return;
++
++    clearTimeout(autosaveTimerRef.current);
++    autosaveTimerRef.current = setTimeout(() => {
++      saveWithConflictHandling('auto');
++    }, 1200);
++
++    return () => clearTimeout(autosaveTimerRef.current);
++  }, [content, dirty, saving, autoSaveBlocked, file.diffInfo, baselineMtimeMs]);
+@@
+             <button
+-              onClick={onClose}
++              onClick={handleRequestClose}
+               className="p-2 md:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
+               title={t('actions.close')}
+             >
+               <X className="w-6 h-6 md:w-4 md:h-4" />
+             </button>
+           </div>
+         </div>
+ 
++        {autoSaveBlocked && showAutoSaveNotice && (
++          <div className="px-4 py-2 border-b border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-900/20 flex items-start gap-2">
++            <AlertTriangle className="w-4 h-4 mt-0.5 text-yellow-700 dark:text-yellow-300" />
++            <div className="flex-1 text-sm text-yellow-900 dark:text-yellow-100">
++              <div className="font-medium">{t('conflict.autosaveSkippedTitle')}</div>
++              <div>{t('conflict.autosaveSkippedBody')}</div>
++            </div>
++            <button
++              onClick={() => setShowAutoSaveNotice(false)}
++              className="p-1 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/40"
++              title={t('actions.close')}
++            >
++              <X className="w-4 h-4 text-yellow-900 dark:text-yellow-100" />
++            </button>
++          </div>
++        )}
++
+         {/* Editor */}
+         <div className="flex-1 overflow-hidden">
+           <CodeMirror
+             ref={editorRef}
+             value={content}
+-            onChange={setContent}
++            onChange={(value) => {
++              setContent(value);
++              setDirty(true);
++            }}
+@@
+         </div>
+ 
+         {/* Footer */}
+@@
+         </div>
+       </div>
+     </div>
++
++    {conflictDialog && (
++      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
++        <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => resolveConflictDialog('cancel')} />
++        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
++          <div className="p-6">
++            <div className="flex items-center mb-4">
++              <div className="p-2 rounded-full mr-3 bg-yellow-100 dark:bg-yellow-900">
++                <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
++              </div>
++              <h3 className="text-lg font-semibold">{t('conflict.title')}</h3>
++            </div>
++            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
++              {t('conflict.message')}
++            </p>
++            <div className="text-sm text-gray-600 dark:text-gray-400 mb-6 space-y-2">
++              <div>\\u2022 {t('conflict.reloadWarning')}</div>
++              <div>\\u2022 {t('conflict.overwriteWarning')}</div>
++            </div>
++
++            <div className="flex justify-end gap-3">
++              <button
++                onClick={() => resolveConflictDialog('cancel')}
++                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
++              >
++                {t('conflict.cancel')}
++              </button>
++              <button
++                onClick={() => resolveConflictDialog('reload')}
++                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
++              >
++                {t('conflict.reload')}
++              </button>
++              <button
++                onClick={() => resolveConflictDialog('overwrite')}
++                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-md"
++              >
++                {t('conflict.overwrite')}
++              </button>
++            </div>
++          </div>
++        </div>
++      </div>
++    )}
+     </>
+   );
+-}
++});
+ 
+ export default CodeEditor;
+diff --git a/src/i18n/locales/en/codeEditor.json b/src/i18n/locales/en/codeEditor.json
+index 0000000..0000000 100644
+--- a/src/i18n/locales/en/codeEditor.json
++++ b/src/i18n/locales/en/codeEditor.json
+@@
+   "footer": {
+     "lines": "Lines:",
+     "characters": "Characters:",
+     "shortcuts": "Press Ctrl+S to save \\u9225?Esc to close"
++  },
++  "conflict": {
++    "title": "File changed on disk",
++    "message": "This file was modified on disk since you opened it. Choose how to resolve the conflict before saving.",
++    "reload": "Reload from disk",
++    "overwrite": "Overwrite on disk",
++    "cancel": "Cancel",
++    "reloadWarning": "Reloading may discard your local unsaved changes and load the disk version.",
++    "overwriteWarning": "Overwriting will replace the disk version with your current edits.",
++    "autosaveSkippedTitle": "Autosave skipped",
++    "autosaveSkippedBody": "The file changed on disk. Autosave was stopped to avoid overwriting it. Use Save to resolve."
+   }
+ }
