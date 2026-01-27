@@ -3,10 +3,10 @@
   "sessionId": "cd3a545e-c31e-4d6b-8d97-3f70e2c1f320",
   "status": "running",
   "startedAt": "2026-01-27T13:07:13.209Z",
-  "updatedAt": "2026-01-27T13:39:22.021Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-01-27T13:57:33.674Z",
+  "currentIteration": 3,
   "maxIterations": 10,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "codex",
   "trackerState": {
@@ -29,8 +29,8 @@
       {
         "id": "US-003",
         "title": "保存能力（防抖自动保存 + `Ctrl/Cmd+S` 手动保存）与脏状态一致",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "US-004",
@@ -84,6 +84,16 @@
       "durationMs": 133066,
       "startedAt": "2026-01-27T13:36:01.292Z",
       "endedAt": "2026-01-27T13:38:14.358Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "US-003",
+      "taskTitle": "保存能力（防抖自动保存 + `Ctrl/Cmd+S` 手动保存）与脏状态一致",
+      "taskCompleted": true,
+      "durationMs": 66195,
+      "startedAt": "2026-01-27T13:38:15.815Z",
+      "endedAt": "2026-01-27T13:39:22.010Z"
     }
   ],
   "skippedTaskIds": [],
