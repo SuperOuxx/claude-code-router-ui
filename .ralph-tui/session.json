@@ -3,10 +3,10 @@
   "sessionId": "cd3a545e-c31e-4d6b-8d97-3f70e2c1f320",
   "status": "running",
   "startedAt": "2026-01-27T13:07:13.209Z",
-  "updatedAt": "2026-01-27T14:38:44.660Z",
-  "currentIteration": 6,
+  "updatedAt": "2026-01-27T14:40:17.647Z",
+  "currentIteration": 7,
   "maxIterations": 10,
-  "tasksCompleted": 6,
+  "tasksCompleted": 7,
   "isPaused": false,
   "agentPlugin": "codex",
   "trackerState": {
@@ -53,8 +53,8 @@
       {
         "id": "US-007",
         "title": "Playwright 覆盖关键用户路径（含回退与冲突分支）",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "US-008",
@@ -124,6 +124,16 @@
       "durationMs": 674631,
       "startedAt": "2026-01-27T14:00:05.789Z",
       "endedAt": "2026-01-27T14:11:20.420Z"
+    },
+    {
+      "iteration": 7,
+      "status": "completed",
+      "taskId": "US-007",
+      "taskTitle": "Playwright 覆盖关键用户路径（含回退与冲突分支）",
+      "taskCompleted": true,
+      "durationMs": 1642654,
+      "startedAt": "2026-01-27T14:11:21.887Z",
+      "endedAt": "2026-01-27T14:38:44.541Z"
     }
   ],
   "skippedTaskIds": [],
