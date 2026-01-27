@@ -3,10 +3,10 @@
   "sessionId": "cd3a545e-c31e-4d6b-8d97-3f70e2c1f320",
   "status": "running",
   "startedAt": "2026-01-27T13:07:13.209Z",
-  "updatedAt": "2026-01-27T13:38:14.371Z",
-  "currentIteration": 1,
+  "updatedAt": "2026-01-27T13:39:22.021Z",
+  "currentIteration": 2,
   "maxIterations": 10,
-  "tasksCompleted": 1,
+  "tasksCompleted": 2,
   "isPaused": false,
   "agentPlugin": "codex",
   "trackerState": {
@@ -23,8 +23,8 @@
       {
         "id": "US-002",
         "title": "Vditor 初始化与编辑/预览单栏切换（`ir` 模式）",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "US-003",
@@ -74,6 +74,16 @@
       "durationMs": 1716308,
       "startedAt": "2026-01-27T13:07:23.481Z",
       "endedAt": "2026-01-27T13:35:59.789Z"
+    },
+    {
+      "iteration": 2,
+      "status": "completed",
+      "taskId": "US-002",
+      "taskTitle": "Vditor 初始化与编辑/预览单栏切换（`ir` 模式）",
+      "taskCompleted": true,
+      "durationMs": 133066,
+      "startedAt": "2026-01-27T13:36:01.292Z",
+      "endedAt": "2026-01-27T13:38:14.358Z"
     }
   ],
   "skippedTaskIds": [],
