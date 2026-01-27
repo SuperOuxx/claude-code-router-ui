@@ -78,6 +78,31 @@ function parseStreamJsonLines(rawChunk, bufferRef) {
   return lines.filter(line => line.trim());
 }
 
+function normalizeClaudeCliMessage(message) {
+  if (!message || typeof message !== 'object') {
+    return [];
+  }
+
+  // CCR/Claude stream-json output wraps Anthropic-style events:
+  // { type: 'stream_event', event: { type: 'content_block_delta', ... }, session_id: '...' }
+  // The frontend expects the inner event type directly (content_block_delta / content_block_stop).
+  if (message.type === 'stream_event' && message.event && typeof message.event === 'object') {
+    const event = { ...message.event };
+    if (message.session_id !== undefined && event.session_id === undefined) {
+      event.session_id = message.session_id;
+    }
+    if (message.parent_tool_use_id !== undefined && event.parent_tool_use_id === undefined) {
+      event.parent_tool_use_id = message.parent_tool_use_id;
+    }
+    if (message.uuid !== undefined && event.uuid === undefined) {
+      event.uuid = message.uuid;
+    }
+    return [event];
+  }
+
+  return [message];
+}
+
 export async function queryClaudeCLI(command, options = {}, ws) {
   const {
     sessionId,
@@ -206,7 +231,9 @@ export async function queryClaudeCLI(command, options = {}, ws) {
     for (const line of lines) {
       try {
         const message = JSON.parse(line);
-        flushMessage(message);
+        for (const normalized of normalizeClaudeCliMessage(message)) {
+          flushMessage(normalized);
+        }
       } catch {
         // Ignore non-JSON stdout (rare, but CCR may print warnings)
       }
@@ -238,7 +265,10 @@ export async function queryClaudeCLI(command, options = {}, ws) {
       const tail = stdoutBuffer.value.trim();
       if (tail) {
         try {
-          flushMessage(JSON.parse(tail));
+          const message = JSON.parse(tail);
+          for (const normalized of normalizeClaudeCliMessage(message)) {
+            flushMessage(normalized);
+          }
         } catch {
           // ignore
         }

@@ -71,8 +71,19 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
   const loadPathSuggestions = async (inputPath) => {
     try {
       // Extract the directory to browse (parent of input)
-      const lastSlash = inputPath.lastIndexOf('/');
-      const dirPath = lastSlash > 0 ? inputPath.substring(0, lastSlash) : '~';
+      const lastForwardSlash = inputPath.lastIndexOf('/');
+      const lastBackSlash = inputPath.lastIndexOf('\\');
+      const lastSeparator = Math.max(lastForwardSlash, lastBackSlash);
+
+      let dirPath = '~';
+      if (lastSeparator > 0) {
+        // Windows drive roots like "C:\" / "C:/" should browse the root, not "C:"
+        if (lastSeparator === 2 && inputPath[1] === ':') {
+          dirPath = inputPath.substring(0, lastSeparator + 1);
+        } else {
+          dirPath = inputPath.substring(0, lastSeparator);
+        }
+      }
 
       const response = await api.browseFilesystem(dirPath);
       const data = await response.json();
@@ -140,7 +151,11 @@ const ProjectCreationWizard = ({ onClose, onProjectCreated }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || t('projectWizard.errors.failedToCreate'));
+        throw new Error(
+          data.details
+            ? `${data.error || t('projectWizard.errors.failedToCreate')}: ${data.details}`
+            : (data.error || t('projectWizard.errors.failedToCreate'))
+        );
       }
 
       // Success!
