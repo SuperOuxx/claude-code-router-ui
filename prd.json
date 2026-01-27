@@ -30,9 +30,10 @@
         "打开文件时从磁盘加载内容到 Vditor，渲染就绪后可编辑"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "labels": [],
-      "dependsOn": []
+      "dependsOn": [],
+      "completionNotes": "Completed by agent"
     },
     {
       "id": "US-003",
@@ -130,6 +131,6 @@
     "createdAt": "2026-01-27T12:12:30.912Z",
     "version": "1.0.0",
     "sourcePrd": "tasks\\prd-prdproject-files-vditor-markdownmd.md",
-    "updatedAt": "2026-01-27T13:35:59.792Z"
+    "updatedAt": "2026-01-27T13:38:14.359Z"
   }
 }

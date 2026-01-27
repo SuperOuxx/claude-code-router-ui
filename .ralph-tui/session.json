@@ -3,10 +3,10 @@
   "sessionId": "cd3a545e-c31e-4d6b-8d97-3f70e2c1f320",
   "status": "running",
   "startedAt": "2026-01-27T13:07:13.209Z",
-  "updatedAt": "2026-01-27T13:35:59.806Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-01-27T13:38:14.371Z",
+  "currentIteration": 1,
   "maxIterations": 10,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "codex",
   "trackerState": {
@@ -17,8 +17,8 @@
       {
         "id": "US-001",
         "title": "`.md` 默认以 Vditor Tab 打开（可回退纯文本并可切回）",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "US-002",
@@ -64,7 +64,18 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "US-001",
+      "taskTitle": "`.md` 默认以 Vditor Tab 打开（可回退纯文本并可切回）",
+      "taskCompleted": true,
+      "durationMs": 1716308,
+      "startedAt": "2026-01-27T13:07:23.481Z",
+      "endedAt": "2026-01-27T13:35:59.789Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "D:\\project\\ai\\claude-code-router-ui",
   "activeTaskIds": [],
