@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "sessionId": "cd3a545e-c31e-4d6b-8d97-3f70e2c1f320",
+  "status": "running",
+  "startedAt": "2026-01-27T13:07:13.209Z",
+  "updatedAt": "2026-01-27T13:35:59.806Z",
+  "currentIteration": 0,
+  "maxIterations": 10,
+  "tasksCompleted": 0,
+  "isPaused": false,
+  "agentPlugin": "codex",
+  "trackerState": {
+    "plugin": "json",
+    "prdPath": "./prd.json",
+    "totalTasks": 8,
+    "tasks": [
+      {
+        "id": "US-001",
+        "title": "`.md` 默认以 Vditor Tab 打开（可回退纯文本并可切回）",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "US-002",
+        "title": "Vditor 初始化与编辑/预览单栏切换（`ir` 模式）",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "US-003",
+        "title": "保存能力（防抖自动保存 + `Ctrl/Cmd+S` 手动保存）与脏状态一致",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "US-004",
+        "title": "保存前外部改动检测（mtime）与冲突处理（仅保存前）",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "US-005",
+        "title": "粘贴/拖拽文件落盘到同目录 `assets/` 并插入引用",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "US-006",
+        "title": "后端安全写入能力与 API 扩展（文本保存 + 资产落盘）",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "US-007",
+        "title": "Playwright 覆盖关键用户路径（含回退与冲突分支）",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "US-008",
+        "title": "交付前可读性重构（不改功能）",
+        "status": "open",
+        "completedInSession": false
+      }
+    ]
+  },
+  "iterations": [],
+  "skippedTaskIds": [],
+  "cwd": "D:\\project\\ai\\claude-code-router-ui",
+  "activeTaskIds": [],
+  "subagentPanelVisible": false
+}
