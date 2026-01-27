@@ -3,10 +3,10 @@
   "sessionId": "cd3a545e-c31e-4d6b-8d97-3f70e2c1f320",
   "status": "running",
   "startedAt": "2026-01-27T13:07:13.209Z",
-  "updatedAt": "2026-01-27T14:11:20.448Z",
-  "currentIteration": 5,
+  "updatedAt": "2026-01-27T14:38:44.660Z",
+  "currentIteration": 6,
   "maxIterations": 10,
-  "tasksCompleted": 5,
+  "tasksCompleted": 6,
   "isPaused": false,
   "agentPlugin": "codex",
   "trackerState": {
@@ -47,8 +47,8 @@
       {
         "id": "US-006",
         "title": "后端安全写入能力与 API 扩展（文本保存 + 资产落盘）",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "US-007",
@@ -114,6 +114,16 @@
       "durationMs": 149192,
       "startedAt": "2026-01-27T13:57:35.099Z",
       "endedAt": "2026-01-27T14:00:04.291Z"
+    },
+    {
+      "iteration": 6,
+      "status": "completed",
+      "taskId": "US-006",
+      "taskTitle": "后端安全写入能力与 API 扩展（文本保存 + 资产落盘）",
+      "taskCompleted": true,
+      "durationMs": 674631,
+      "startedAt": "2026-01-27T14:00:05.789Z",
+      "endedAt": "2026-01-27T14:11:20.420Z"
     }
   ],
   "skippedTaskIds": [],
