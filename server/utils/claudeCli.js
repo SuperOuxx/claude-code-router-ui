@@ -1,9 +1,16 @@
 import { parse as parseShellCommand, quote as quoteShellCommand } from 'shell-quote';
 
+const CCR_COMMAND_REGEX = /(?:^|[\\/])ccr(?:\\.exe)?$/i;
+
 function normalizeEnvValue(value) {
-  if (typeof value !== 'string') return '';
+  if (typeof value !== 'string') {
+    return '';
+  }
+
   const trimmed = value.trim();
-  if (!trimmed) return '';
+  if (!trimmed) {
+    return '';
+  }
 
   const hasWrappingDoubleQuotes = trimmed.startsWith('"') && trimmed.endsWith('"');
   const hasWrappingSingleQuotes = trimmed.startsWith("'") && trimmed.endsWith("'");
@@ -16,15 +23,17 @@ function normalizeEnvValue(value) {
 
 function parseCliTokens(value) {
   const normalized = normalizeEnvValue(value);
-  if (!normalized) return [];
+  if (!normalized) {
+    return [];
+  }
 
   const parsed = parseShellCommand(normalized);
-  const hasOperators = parsed.some(token => typeof token === 'object' && token?.op);
+  const hasOperators = parsed.some((token) => typeof token === 'object' && token?.op);
   if (hasOperators) {
     throw new Error('CLI command cannot include shell operators');
   }
 
-  return parsed.filter(token => typeof token === 'string');
+  return parsed.filter((token) => typeof token === 'string');
 }
 
 function quotePowerShellToken(token) {
@@ -49,6 +58,19 @@ export function getClaudeCliTokens(extraArgs = []) {
   return [command, ...argsPrefix, ...extraArgs.map(String)];
 }
 
+export function shouldUseClaudeCliChat() {
+  const chatMode = (process.env.CLAUDE_CHAT_MODE || '').trim().toLowerCase();
+  if (chatMode === 'cli') {
+    return true;
+  }
+  if (chatMode === 'sdk') {
+    return false;
+  }
+
+  const [command] = getClaudeCliTokens();
+  return Boolean(command && CCR_COMMAND_REGEX.test(command));
+}
+
 export function formatBashInvocation(tokens) {
   return quoteShellCommand(tokens);
 }
@@ -58,4 +80,3 @@ export function formatPowerShellInvocation(tokens) {
   const quotedArgs = args.map(quotePowerShellToken).join(' ');
   return `& ${quotePowerShellToken(command)}${quotedArgs ? ` ${quotedArgs}` : ''}`;
 }
-
