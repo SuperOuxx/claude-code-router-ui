@@ -980,6 +980,8 @@ function AppContent() {
   );
 }
 
+import { Agentation } from 'agentation';
+
 // Root App component with router
 function App() {
   return (
@@ -1002,6 +1004,7 @@ function App() {
           </WebSocketProvider>
         </AuthProvider>
       </ThemeProvider>
+      <Agentation />
     </I18nextProvider>
   );
 }
