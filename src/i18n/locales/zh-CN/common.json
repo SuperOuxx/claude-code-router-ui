@@ -98,6 +98,10 @@
   "fileTree": {
     "loading": "正在加载文件...",
     "files": "文件",
+    "open": "打开",
+    "openInNewTab": "在新 Tab 打开",
+    "closeAllTabs": "关闭全部 Tab",
+    "unsavedChangesConfirm": "有未保存的修改，仍要关闭吗？",
     "simpleView": "简单视图",
     "compactView": "紧凑视图",
     "detailedView": "详细视图",

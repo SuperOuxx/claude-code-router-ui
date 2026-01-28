@@ -98,6 +98,10 @@
   "fileTree": {
     "loading": "Loading files...",
     "files": "Files",
+    "open": "Open",
+    "openInNewTab": "Open in new tab",
+    "closeAllTabs": "Close all tabs",
+    "unsavedChangesConfirm": "You have unsaved changes. Close anyway?",
     "simpleView": "Simple view",
     "compactView": "Compact view",
     "detailedView": "Detailed view",

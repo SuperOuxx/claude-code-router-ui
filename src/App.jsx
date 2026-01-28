@@ -353,18 +353,21 @@ function AppContent() {
   // Handle URL-based session loading
   useEffect(() => {
     if (sessionId && projects.length > 0) {
-      // Only switch tabs on initial load, not on every project update
-      const shouldSwitchTab = !selectedSession || selectedSession.id !== sessionId;
+      // Check if session actually changed
+      const sessionChanged = !selectedSession || selectedSession.id !== sessionId;
+
+      // Only proceed if the session ID actually changed
+      if (!sessionChanged) {
+        return;
+      }
+
       // Find the session across all projects
       for (const project of projects) {
         let session = project.sessions?.find(s => s.id === sessionId);
         if (session) {
           setSelectedProject(project);
           setSelectedSession({ ...session, __provider: 'claude' });
-          // Only switch to chat tab if we're loading a different session
-          if (shouldSwitchTab) {
-            setActiveTab('chat');
-          }
+          setActiveTab('chat');
           return;
         }
         // Also check Cursor sessions
@@ -372,13 +375,11 @@ function AppContent() {
         if (cSession) {
           setSelectedProject(project);
           setSelectedSession({ ...cSession, __provider: 'cursor' });
-          if (shouldSwitchTab) {
-            setActiveTab('chat');
-          }
+          setActiveTab('chat');
           return;
         }
       }
-      
+
       // If session not found, it might be a newly created session
       // Just navigate to it and it will be found when the sidebar refreshes
       // Don't redirect to home, let the session load naturally
@@ -936,6 +937,8 @@ function AppContent() {
           autoScrollToBottom={autoScrollToBottom}
           sendByCtrlEnter={sendByCtrlEnter}
           externalMessageUpdate={externalMessageUpdate}
+          projects={projects}
+          onNewSession={handleNewSession}
         />
       </div>
 
@@ -980,6 +983,8 @@ function AppContent() {
   );
 }
 
+import { Agentation } from 'agentation';
+
 // Root App component with router
 function App() {
   return (
@@ -1002,6 +1007,7 @@ function App() {
           </WebSocketProvider>
         </AuthProvider>
       </ThemeProvider>
+      <Agentation />
     </I18nextProvider>
   );
 }

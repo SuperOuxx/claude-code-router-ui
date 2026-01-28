@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
@@ -6,6 +6,7 @@ import { Input } from './ui/input';
 import { Folder, FolderOpen, File, FileText, FileCode, List, TableProperties, Eye, Search, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import CodeEditor from './CodeEditor';
+import MarkdownFileEditor from './MarkdownFileEditor';
 import ImageViewer from './ImageViewer';
 import { api } from '../utils/api';
 
@@ -14,11 +15,15 @@ function FileTree({ selectedProject }) {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [expandedDirs, setExpandedDirs] = useState(new Set());
-  const [selectedFile, setSelectedFile] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [viewMode, setViewMode] = useState('detailed'); // 'simple', 'detailed', 'compact'
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredFiles, setFilteredFiles] = useState([]);
+  const nextTabIdRef = useRef(1);
+  const [editorTabs, setEditorTabs] = useState([]); // [{ id, file }]
+  const [activeTabId, setActiveTabId] = useState(null);
+  const [tabDirtyMap, setTabDirtyMap] = useState({});
+  const [contextMenu, setContextMenu] = useState(null); // { x, y, file }
 
   useEffect(() => {
     if (selectedProject) {
@@ -117,6 +122,66 @@ function FileTree({ selectedProject }) {
     localStorage.setItem('file-tree-view-mode', mode);
   };
 
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handleClick = () => setContextMenu(null);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    document.addEventListener('click', handleClick);
+    document.addEventListener('contextmenu', handleClick);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('contextmenu', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu]);
+
+  const closeTab = (tabId) => {
+    if (tabDirtyMap[tabId] && !window.confirm(t('fileTree.unsavedChangesConfirm'))) return;
+    const nextTabs = editorTabs.filter(tab => tab.id !== tabId);
+    setEditorTabs(nextTabs);
+    setTabDirtyMap(prev => {
+      const next = { ...prev };
+      delete next[tabId];
+      return next;
+    });
+    if (activeTabId === tabId) {
+      setActiveTabId(nextTabs.length ? nextTabs[nextTabs.length - 1].id : null);
+    }
+  };
+
+  const closeAllTabs = () => {
+    const hasDirty = editorTabs.some(tab => tabDirtyMap[tab.id]);
+    if (hasDirty && !window.confirm(t('fileTree.unsavedChangesConfirm'))) return;
+    setEditorTabs([]);
+    setActiveTabId(null);
+    setTabDirtyMap({});
+  };
+
+  const openProjectFile = (file, { newTab = false } = {}) => {
+    const existing = editorTabs.find(tab =>
+      tab.file.projectName === file.projectName && tab.file.path === file.path
+    );
+    if (existing) {
+      setActiveTabId(existing.id);
+      return;
+    }
+
+    if (newTab || !activeTabId) {
+      const id = `tab-${nextTabIdRef.current++}`;
+      setEditorTabs([...editorTabs, { id, file }]);
+      setActiveTabId(id);
+      return;
+    }
+
+    if (tabDirtyMap[activeTabId] && !window.confirm(t('fileTree.unsavedChangesConfirm'))) return;
+
+    setTabDirtyMap(prev => ({ ...prev, [activeTabId]: false }));
+    setEditorTabs(editorTabs.map(tab => tab.id === activeTabId ? { ...tab, file } : tab));
+  };
+
   // Format file size
   const formatFileSize = (bytes) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -161,14 +226,28 @@ function FileTree({ selectedProject }) {
                 projectName: selectedProject.name
               });
             } else {
-              // Open file in editor
-              setSelectedFile({
+              openProjectFile({
                 name: item.name,
                 path: item.path,
                 projectPath: selectedProject.path,
                 projectName: selectedProject.name
-              });
+              }, { newTab: false });
             }
+          }}
+          onContextMenu={(e) => {
+            if (item.type !== 'file') return;
+            if (isImageFile(item.name)) return;
+            e.preventDefault();
+            setContextMenu({
+              x: e.clientX,
+              y: e.clientY,
+              file: {
+                name: item.name,
+                path: item.path,
+                projectPath: selectedProject.path,
+                projectName: selectedProject.name
+              }
+            });
           }}
         >
           <div className="flex items-center gap-2 min-w-0 w-full">
@@ -205,6 +284,10 @@ function FileTree({ selectedProject }) {
     return imageExtensions.includes(ext);
   };
 
+  const isMarkdownFile = (filename) => {
+    return filename?.toLowerCase().endsWith('.md');
+  };
+
   const getFileIcon = (filename) => {
     const ext = filename.split('.').pop()?.toLowerCase();
     
@@ -223,7 +306,7 @@ function FileTree({ selectedProject }) {
     }
   };
 
-  // Render detailed view with table-like layout
+  // Render detailed view with table-like layout - Name column only
   const renderDetailedView = (items, level = 0) => {
     return items.map((item) => (
       <div key={item.path} className="select-none">
@@ -243,16 +326,31 @@ function FileTree({ selectedProject }) {
                 projectName: selectedProject.name
               });
             } else {
-              setSelectedFile({
+              openProjectFile({
                 name: item.name,
                 path: item.path,
                 projectPath: selectedProject.path,
                 projectName: selectedProject.name
-              });
+              }, { newTab: false });
             }
           }}
+          onContextMenu={(e) => {
+            if (item.type !== 'file') return;
+            if (isImageFile(item.name)) return;
+            e.preventDefault();
+            setContextMenu({
+              x: e.clientX,
+              y: e.clientY,
+              file: {
+                name: item.name,
+                path: item.path,
+                projectPath: selectedProject.path,
+                projectName: selectedProject.name
+              }
+            });
+          }}
         >
-          <div className="col-span-5 flex items-center gap-2 min-w-0">
+          <div className="col-span-12 flex items-center gap-2 min-w-0">
             {item.type === 'directory' ? (
               expandedDirs.has(item.path) ? (
                 <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -266,32 +364,23 @@ function FileTree({ selectedProject }) {
               {item.name}
             </span>
           </div>
-          <div className="col-span-2 text-sm text-muted-foreground">
-            {item.type === 'file' ? formatFileSize(item.size) : '-'}
-          </div>
-          <div className="col-span-3 text-sm text-muted-foreground">
-            {formatRelativeTime(item.modified)}
-          </div>
-          <div className="col-span-2 text-sm text-muted-foreground font-mono">
-            {item.permissionsRwx || '-'}
-          </div>
         </div>
-        
-        {item.type === 'directory' && 
-         expandedDirs.has(item.path) && 
-         item.children && 
+
+        {item.type === 'directory' &&
+         expandedDirs.has(item.path) &&
+         item.children &&
          renderDetailedView(item.children, level + 1)}
       </div>
     ));
   };
 
-  // Render compact view with inline details
+  // Render compact view - Name column only
   const renderCompactView = (items, level = 0) => {
     return items.map((item) => (
       <div key={item.path} className="select-none">
         <div
           className={cn(
-            "flex items-center justify-between p-2 hover:bg-accent cursor-pointer",
+            "flex items-center p-2 hover:bg-accent cursor-pointer",
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
           onClick={() => {
@@ -305,13 +394,28 @@ function FileTree({ selectedProject }) {
                 projectName: selectedProject.name
               });
             } else {
-              setSelectedFile({
+              openProjectFile({
                 name: item.name,
                 path: item.path,
                 projectPath: selectedProject.path,
                 projectName: selectedProject.name
-              });
+              }, { newTab: false });
             }
+          }}
+          onContextMenu={(e) => {
+            if (item.type !== 'file') return;
+            if (isImageFile(item.name)) return;
+            e.preventDefault();
+            setContextMenu({
+              x: e.clientX,
+              y: e.clientY,
+              file: {
+                name: item.name,
+                path: item.path,
+                projectPath: selectedProject.path,
+                projectName: selectedProject.name
+              }
+            });
           }}
         >
           <div className="flex items-center gap-2 min-w-0">
@@ -328,19 +432,11 @@ function FileTree({ selectedProject }) {
               {item.name}
             </span>
           </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {item.type === 'file' && (
-              <>
-                <span>{formatFileSize(item.size)}</span>
-                <span className="font-mono">{item.permissionsRwx}</span>
-              </>
-            )}
-          </div>
         </div>
-        
-        {item.type === 'directory' && 
-         expandedDirs.has(item.path) && 
-         item.children && 
+
+        {item.type === 'directory' &&
+         expandedDirs.has(item.path) &&
+         item.children &&
          renderCompactView(item.children, level + 1)}
       </div>
     ));
@@ -417,18 +513,6 @@ function FileTree({ selectedProject }) {
         </div>
       </div>
 
-      {/* Column Headers for Detailed View */}
-      {viewMode === 'detailed' && filteredFiles.length > 0 && (
-        <div className="px-4 pt-2 pb-1 border-b border-border">
-          <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
-            <div className="col-span-5">{t('fileTree.name')}</div>
-            <div className="col-span-2">{t('fileTree.size')}</div>
-            <div className="col-span-3">{t('fileTree.modified')}</div>
-            <div className="col-span-2">{t('fileTree.permissions')}</div>
-          </div>
-        </div>
-      )}
-
       <ScrollArea className="flex-1 p-4">
         {files.length === 0 ? (
           <div className="text-center py-8">
@@ -459,13 +543,112 @@ function FileTree({ selectedProject }) {
         )}
       </ScrollArea>
       
-      {/* Code Editor Modal */}
-      {selectedFile && (
-        <CodeEditor
-          file={selectedFile}
-          onClose={() => setSelectedFile(null)}
-          projectPath={selectedFile.projectPath}
-        />
+      {/* Context Menu */}
+      {contextMenu && (
+        <div className="fixed inset-0 z-50" onClick={() => setContextMenu(null)}>
+          <div
+            className="fixed bg-background border border-border rounded-md shadow-lg p-1 w-48"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded"
+              onClick={() => {
+                openProjectFile(contextMenu.file, { newTab: false });
+                setContextMenu(null);
+              }}
+            >
+              {t('fileTree.open')}
+            </button>
+            <button
+              type="button"
+              className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded"
+              onClick={() => {
+                openProjectFile(contextMenu.file, { newTab: true });
+                setContextMenu(null);
+              }}
+            >
+              {t('fileTree.openInNewTab')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Editor Tabs Modal */}
+      {editorTabs.length > 0 && (
+        <div className="fixed inset-0 z-40 md:bg-black/50 md:flex md:items-center md:justify-center md:p-4">
+          <div className="bg-background shadow-2xl flex flex-col w-full h-full md:rounded-lg md:shadow-2xl md:w-full md:max-w-6xl md:h-[80vh] md:max-h-[80vh]">
+            <div className="flex items-center justify-between p-2 border-b border-border bg-muted gap-2">
+              <div className="flex-1 flex items-center gap-1 overflow-x-auto">
+                {editorTabs.map((tab) => {
+                  const isActive = tab.id === activeTabId;
+                  const isDirty = !!tabDirtyMap[tab.id];
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTabId(tab.id)}
+                      className={cn(
+                        'px-3 py-2 rounded-md text-sm whitespace-nowrap flex items-center gap-2',
+                        isActive ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:bg-accent'
+                      )}
+                      title={tab.file.path}
+                    >
+                      <span className="truncate max-w-[240px]">{tab.file.name}{isDirty ? ' *' : ''}</span>
+                      <span
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          closeTab(tab.id);
+                        }}
+                        title={t('codeEditor:actions.close')}
+                      >
+                        <X className="w-4 h-4" />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={closeAllTabs}
+                title={t('fileTree.closeAllTabs')}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="flex-1 min-h-0">
+              {editorTabs.map((tab) => (
+                <div key={tab.id} className={tab.id === activeTabId ? 'h-full' : 'hidden'}>
+                  {isMarkdownFile(tab.file.name) ? (
+                    <MarkdownFileEditor
+                      file={tab.file}
+                      onClose={() => closeTab(tab.id)}
+                      isActive={tab.id === activeTabId}
+                      onDirtyChange={(dirty) => {
+                        setTabDirtyMap(prev => ({ ...prev, [tab.id]: dirty }));
+                      }}
+                    />
+                  ) : (
+                    <CodeEditor
+                      file={tab.file}
+                      onClose={() => closeTab(tab.id)}
+                      projectPath={tab.file.projectPath}
+                      isSidebar={true}
+                      isActive={tab.id === activeTabId}
+                      onDirtyChange={(dirty) => {
+                        setTabDirtyMap(prev => ({ ...prev, [tab.id]: dirty }));
+                      }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
       
       {/* Image Viewer Modal */}

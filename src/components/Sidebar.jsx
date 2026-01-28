@@ -13,6 +13,7 @@ import CursorLogo from './CursorLogo.jsx';
 import CodexLogo from './CodexLogo.jsx';
 import TaskIndicator from './TaskIndicator';
 import ProjectCreationWizard from './ProjectCreationWizard';
+import FileTree from './FileTree';
 import { api } from '../utils/api';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
 import { useTasksSettings } from '../contexts/TasksSettingsContext';
@@ -83,6 +84,7 @@ function Sidebar({
   const [deletingProjects, setDeletingProjects] = useState(new Set());
   const [deleteConfirmation, setDeleteConfirmation] = useState(null); // { project, sessionCount }
   const [sessionDeleteConfirmation, setSessionDeleteConfirmation] = useState(null); // { projectName, sessionId, sessionTitle, provider }
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false); // Session dropdown visibility
 
   // TaskMaster context
   const { setCurrentProject, mcpServerStatus } = useTaskMaster();
@@ -782,6 +784,7 @@ function Sidebar({
           </div>
         </div>
       )}
+
       
       {/* Projects List */}
       <ScrollArea className="flex-1 md:px-2 md:py-3 overflow-y-auto overscroll-contain">
@@ -1155,307 +1158,13 @@ function Sidebar({
                     </Button>
                   </div>
 
-                  {/* Sessions List */}
+                  {/* File Tree - Show when project is expanded */}
                   {isExpanded && (
-                    <div className="ml-3 space-y-1 border-l border-border pl-3">
-                      {!initialSessionsLoaded.has(project.name) ? (
-                        // Loading skeleton for sessions
-                        Array.from({ length: 3 }).map((_, i) => (
-                          <div key={i} className="p-2 rounded-md">
-                            <div className="flex items-start gap-2">
-                              <div className="w-3 h-3 bg-muted rounded-full animate-pulse mt-0.5" />
-                              <div className="flex-1 space-y-1">
-                                <div className="h-3 bg-muted rounded animate-pulse" style={{ width: `${60 + i * 15}%` }} />
-                                <div className="h-2 bg-muted rounded animate-pulse w-1/2" />
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : getAllSessions(project).length === 0 && !loadingSessions[project.name] ? (
-                        <div className="py-2 px-3 text-left">
-                          <p className="text-xs text-muted-foreground">{t('sessions.noSessions')}</p>
-                        </div>
-                      ) : (
-                        getAllSessions(project).map((session) => {
-                          // Handle Claude, Cursor, and Codex session formats
-                          const isCursorSession = session.__provider === 'cursor';
-                          const isCodexSession = session.__provider === 'codex';
-
-                          // Calculate if session is active (within last 10 minutes)
-                          const getSessionDate = () => {
-                            if (isCursorSession) return new Date(session.createdAt);
-                            if (isCodexSession) return new Date(session.createdAt || session.lastActivity);
-                            return new Date(session.lastActivity);
-                          };
-                          const sessionDate = getSessionDate();
-                          const diffInMinutes = Math.floor((currentTime - sessionDate) / (1000 * 60));
-                          const isActive = diffInMinutes < 10;
-
-                          // Get session display values
-                          const getSessionName = () => {
-                            if (isCursorSession) return session.name || t('projects.untitledSession');
-                            if (isCodexSession) return session.summary || session.name || t('projects.codexSession');
-                            return session.summary || t('projects.newSession');
-                          };
-                          const sessionName = getSessionName();
-                          const getSessionTime = () => {
-                            if (isCursorSession) return session.createdAt;
-                            if (isCodexSession) return session.createdAt || session.lastActivity;
-                            return session.lastActivity;
-                          };
-                          const sessionTime = getSessionTime();
-                          const messageCount = session.messageCount || 0;
-                          
-                          return (
-                          <div key={session.id} className="group relative">
-                            {/* Active session indicator dot */}
-                            {isActive && (
-                              <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-1">
-                                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                              </div>
-                            )}
-                            {/* Mobile Session Item */}
-                            <div className="md:hidden">
-                              <div
-                                className={cn(
-                                  "p-2 mx-3 my-0.5 rounded-md bg-card border active:scale-[0.98] transition-all duration-150 relative",
-                                  selectedSession?.id === session.id ? "bg-primary/5 border-primary/20" :
-                                  isActive ? "border-green-500/30 bg-green-50/5 dark:bg-green-900/5" : "border-border/30"
-                                )}
-                                onClick={() => {
-                                  handleProjectSelect(project);
-                                  handleSessionClick(session, project.name);
-                                }}
-                                onTouchEnd={handleTouchClick(() => {
-                                  handleProjectSelect(project);
-                                  handleSessionClick(session, project.name);
-                                })}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <div className={cn(
-                                    "w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0",
-                                    selectedSession?.id === session.id ? "bg-primary/10" : "bg-muted/50"
-                                  )}>
-                                    {isCursorSession ? (
-                                      <CursorLogo className="w-3 h-3" />
-                                    ) : isCodexSession ? (
-                                      <CodexLogo className="w-3 h-3" />
-                                    ) : (
-                                      <ClaudeLogo className="w-3 h-3" />
-                                    )}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-xs font-medium truncate text-foreground">
-                                      {sessionName}
-                                    </div>
-                                <div className="flex items-center gap-1 mt-0.5">
-                                      <Clock className="w-2.5 h-2.5 text-muted-foreground" />
-                                      <span className="text-xs text-muted-foreground">
-                                        {formatTimeAgo(sessionTime, currentTime, t)}
-                                      </span>
-                                      {messageCount > 0 && (
-                                        <Badge variant="secondary" className="text-xs px-1 py-0 ml-auto">
-                                          {messageCount}
-                                        </Badge>
-                                      )}
-                                  {/* Provider tiny icon */}
-                                  <span className="ml-1 opacity-70">
-                                    {isCursorSession ? (
-                                      <CursorLogo className="w-3 h-3" />
-                                    ) : isCodexSession ? (
-                                      <CodexLogo className="w-3 h-3" />
-                                    ) : (
-                                      <ClaudeLogo className="w-3 h-3" />
-                                    )}
-                                  </span>
-                                    </div>
-                                  </div>
-                                  {!isCursorSession && (
-                                    <button
-                                      className="w-5 h-5 rounded-md bg-red-50 dark:bg-red-900/20 flex items-center justify-center active:scale-95 transition-transform opacity-70 ml-1"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        showDeleteSessionConfirmation(project.name, session.id, sessionName, session.__provider);
-                                      }}
-                                      onTouchEnd={handleTouchClick(() => showDeleteSessionConfirmation(project.name, session.id, sessionName, session.__provider))}
-                                    >
-                                      <Trash2 className="w-2.5 h-2.5 text-red-600 dark:text-red-400" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* Desktop Session Item */}
-                            <div className="hidden md:block">
-                              <Button
-                                variant="ghost"
-                                className={cn(
-                                  "w-full justify-start p-2 h-auto font-normal text-left hover:bg-accent/50 transition-colors duration-200",
-                                  selectedSession?.id === session.id && "bg-accent text-accent-foreground"
-                                )}
-                                onClick={() => handleSessionClick(session, project.name)}
-                                onTouchEnd={handleTouchClick(() => handleSessionClick(session, project.name))}
-                              >
-                                <div className="flex items-start gap-2 min-w-0 w-full">
-                                  {isCursorSession ? (
-                                    <CursorLogo className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                  ) : isCodexSession ? (
-                                    <CodexLogo className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                  ) : (
-                                    <ClaudeLogo className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                  )}
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-xs font-medium truncate text-foreground">
-                                      {sessionName}
-                                    </div>
-                                    <div className="flex items-center gap-1 mt-0.5">
-                                      <Clock className="w-2.5 h-2.5 text-muted-foreground" />
-                                      <span className="text-xs text-muted-foreground">
-                                        {formatTimeAgo(sessionTime, currentTime, t)}
-                                      </span>
-                                      {messageCount > 0 && (
-                                        <Badge variant="secondary" className="text-xs px-1 py-0 ml-auto group-hover:opacity-0 transition-opacity">
-                                          {messageCount}
-                                        </Badge>
-                                      )}
-                                      <span className="ml-1 opacity-70 group-hover:opacity-0 transition-opacity">
-                                        {isCursorSession ? (
-                                          <CursorLogo className="w-3 h-3" />
-                                        ) : isCodexSession ? (
-                                          <CodexLogo className="w-3 h-3" />
-                                        ) : (
-                                          <ClaudeLogo className="w-3 h-3" />
-                                        )}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </Button>
-                              {!isCursorSession && (
-                              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                                {editingSession === session.id && !isCodexSession ? (
-                                  <>
-                                    <input
-                                      type="text"
-                                      value={editingSessionName}
-                                      onChange={(e) => setEditingSessionName(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        e.stopPropagation();
-                                        if (e.key === 'Enter') {
-                                          updateSessionSummary(project.name, session.id, editingSessionName);
-                                        } else if (e.key === 'Escape') {
-                                          setEditingSession(null);
-                                          setEditingSessionName('');
-                                        }
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="w-32 px-2 py-1 text-xs border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary"
-                                      autoFocus
-                                    />
-                                    <button
-                                      className="w-6 h-6 bg-green-50 hover:bg-green-100 dark:bg-green-900/20 dark:hover:bg-green-900/40 rounded flex items-center justify-center"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        updateSessionSummary(project.name, session.id, editingSessionName);
-                                      }}
-                                      title={t('tooltips.save')}
-                                    >
-                                      <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
-                                    </button>
-                                    <button
-                                      className="w-6 h-6 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40 rounded flex items-center justify-center"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingSession(null);
-                                        setEditingSessionName('');
-                                      }}
-                                      title={t('tooltips.cancel')}
-                                    >
-                                      <X className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    {!isCodexSession && (
-                                      <button
-                                        className="w-6 h-6 bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/20 dark:hover:bg-gray-900/40 rounded flex items-center justify-center"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setEditingSession(session.id);
-                                          setEditingSessionName(session.summary || t('projects.newSession'));
-                                        }}
-                                        title={t('tooltips.editSessionName')}
-                                      >
-                                        <Edit2 className="w-3 h-3 text-gray-600 dark:text-gray-400" />
-                                      </button>
-                                    )}
-                                    <button
-                                      className="w-6 h-6 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded flex items-center justify-center"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        showDeleteSessionConfirmation(project.name, session.id, sessionName, session.__provider);
-                                      }}
-                                      title={t('tooltips.deleteSession')}
-                                    >
-                                      <Trash2 className="w-3 h-3 text-red-600 dark:text-red-400" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                              )}
-                            </div>
-                          </div>
-                          );
-                        })
-                      )}
-
-                      {/* Show More Sessions Button */}
-                      {getAllSessions(project).length > 0 && project.sessionMeta?.hasMore !== false && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-center gap-2 mt-2 text-muted-foreground"
-                          onClick={() => loadMoreSessions(project)}
-                          disabled={loadingSessions[project.name]}
-                        >
-                          {loadingSessions[project.name] ? (
-                            <>
-                              <div className="w-3 h-3 animate-spin rounded-full border border-muted-foreground border-t-transparent" />
-                              {t('sessions.loading')}
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="w-3 h-3" />
-                              {t('sessions.showMore')}
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      
-                      {/* Sessions - New Session Button */}
-                      <div className="md:hidden px-3 pb-2">
-                        <button
-                          className="w-full h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-md flex items-center justify-center gap-2 font-medium text-xs active:scale-[0.98] transition-all duration-150"
-                          onClick={() => {
-                            handleProjectSelect(project);
-                            onNewSession(project);
-                          }}
-                        >
-                          <Plus className="w-3 h-3" />
-                          {t('sessions.newSession')}
-                        </button>
+                    <div className="ml-3 border-l border-border pl-3">
+                      {/* FileTree component */}
+                      <div className="h-full overflow-hidden">
+                        <FileTree selectedProject={project} />
                       </div>
-                      
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="hidden md:flex w-full justify-start gap-2 mt-1 h-8 text-xs font-medium bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
-                        onClick={() => onNewSession(project)}
-                      >
-                        <Plus className="w-3 h-3" />
-                        {t('sessions.newSession')}
-                      </Button>
                     </div>
                   )}
                 </div>

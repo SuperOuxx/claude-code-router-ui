@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useImperativeHandle } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -10,11 +10,12 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorView, showPanel, ViewPlugin } from '@codemirror/view';
 import { unifiedMergeView, getChunks } from '@codemirror/merge';
 import { showMinimap } from '@replit/codemirror-minimap';
-import { X, Save, Download, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Save, Download, Maximize2, Minimize2, AlertTriangle } from 'lucide-react';
 import { api } from '../utils/api';
 import { useTranslation } from 'react-i18next';
+import { loadVditor } from '../lib/vditorLoader';
 
-function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded = false, onToggleExpand = null }) {
+const CodeEditor = React.forwardRef(function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded = false, onToggleExpand = null, isActive = true, onDirtyChange = null }, ref) {
   const { t } = useTranslation('codeEditor');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -39,6 +40,37 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
     return localStorage.getItem('codeEditorFontSize') || '14';
   });
   const editorRef = useRef(null);
+  const autosaveTimerRef = useRef(null);
+  const [baselineMtimeMs, setBaselineMtimeMs] = useState(null);
+  const [autoSaveBlocked, setAutoSaveBlocked] = useState(false);
+  const [showAutoSaveNotice, setShowAutoSaveNotice] = useState(false);
+  const [conflictDialog, setConflictDialog] = useState(null); // { resolve }
+  const [savedContent, setSavedContent] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    setShowDiff(!!file.diffInfo);
+  }, [file.diffInfo]);
+
+  const promptConflictResolution = () =>
+    new Promise((resolve) => setConflictDialog({ resolve }));
+
+  const resolveConflictDialog = (choice) => {
+    conflictDialog?.resolve(choice);
+    setConflictDialog(null);
+  };
+
+  const isMarkdownFile = useMemo(() => {
+    const name = (file?.name || '').toLowerCase();
+    return name.endsWith('.md') || name.endsWith('.markdown');
+  }, [file?.name]);
+
+  const [markdownEditorMode, setMarkdownEditorMode] = useState('plain'); // 'plain' | 'vditor'
+  const [vditorError, setVditorError] = useState(null);
+  const vditorIdRef = useRef(`vditor-${Math.random().toString(36).slice(2)}`);
+  const vditorInstanceRef = useRef(null);
+  const vditorApplyingExternalValueRef = useRef(false);
+  const lastDirtyRef = useRef(false);
 
   // Create minimap extension with chunk-based gutters
   const minimapExtension = useMemo(() => {
@@ -289,6 +321,8 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
     const loadFileContent = async () => {
       try {
         setLoading(true);
+        setAutoSaveBlocked(false);
+        setShowAutoSaveNotice(false);
 
         // If we have diffInfo with both old and new content, we can show the diff directly
         // This handles both GitPanel (full content) and ChatInterface (full content from API)
@@ -296,6 +330,14 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
           // Use the new_string as the content to display
           // The unifiedMergeView will compare it against old_string
           setContent(file.diffInfo.new_string);
+          setSavedContent(file.diffInfo.new_string);
+          const statResponse = await api.readFile(file.projectName, file.path);
+          if (statResponse.ok) {
+            const statData = await statResponse.json();
+            setBaselineMtimeMs(statData.mtimeMs ?? null);
+          } else {
+            setBaselineMtimeMs(null);
+          }
           setLoading(false);
           return;
         }
@@ -309,9 +351,14 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
 
         const data = await response.json();
         setContent(data.content);
+        setSavedContent(data.content);
+        setBaselineMtimeMs(data.mtimeMs ?? null);
       } catch (error) {
         console.error('Error loading file:', error);
-        setContent(`// Error loading file: ${error.message}\n// File: ${file.name}\n// Path: ${file.path}`);
+        const errorText = `// Error loading file: ${error.message}\n// File: ${file.name}\n// Path: ${file.path}`;
+        setContent(errorText);
+        setSavedContent(errorText);
+        setBaselineMtimeMs(null);
       } finally {
         setLoading(false);
       }
@@ -320,48 +367,220 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
     loadFileContent();
   }, [file, projectPath]);
 
-  const handleSave = async () => {
-    setSaving(true);
+  useEffect(() => {
+    if (isMarkdownFile) {
+      setMarkdownEditorMode('vditor');
+    } else {
+      setMarkdownEditorMode('plain');
+    }
+    setVditorError(null);
+  }, [isMarkdownFile, file.path]);
+
+  useEffect(() => {
+    const dirty = content !== savedContent;
+    setIsDirty(dirty);
+    if (onDirtyChange && lastDirtyRef.current !== dirty) {
+      lastDirtyRef.current = dirty;
+      onDirtyChange(dirty);
+    }
+  }, [content, savedContent, onDirtyChange]);
+
+  const destroyVditor = () => {
     try {
-      console.log('Saving file:', {
-        projectName: file.projectName,
-        path: file.path,
-        contentLength: content?.length
-      });
+      vditorInstanceRef.current?.destroy?.();
+    } catch (e) {
+      // ignore
+    }
+    vditorInstanceRef.current = null;
+  };
 
-      const response = await api.saveFile(file.projectName, file.path, content);
+  useEffect(() => {
+    if (!isMarkdownFile) return;
+    if (markdownEditorMode !== 'vditor') {
+      destroyVditor();
+      return;
+    }
+    if (!isActive) {
+      destroyVditor();
+      return;
+    }
 
-      console.log('Save response:', {
-        status: response.status,
-        ok: response.ok,
-        contentType: response.headers.get('content-type')
-      });
+    let cancelled = false;
+    const init = async () => {
+      try {
+        const Vditor = await loadVditor();
+        if (cancelled) return;
+        if (vditorInstanceRef.current) return;
 
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `Save failed: ${response.status}`);
-        } else {
-          const textError = await response.text();
-          console.error('Non-JSON error response:', textError);
-          throw new Error(`Save failed: ${response.status} ${response.statusText}`);
-        }
+        vditorInstanceRef.current = new Vditor(vditorIdRef.current, {
+          mode: 'ir',
+          height: '100%',
+          cache: { enable: false },
+          toolbarConfig: { pin: false },
+          input: (value) => {
+            if (vditorApplyingExternalValueRef.current) return;
+            setContent(value);
+          },
+          after: () => {
+            if (!vditorInstanceRef.current) return;
+            vditorApplyingExternalValueRef.current = true;
+            vditorInstanceRef.current.setValue(content || '');
+            vditorApplyingExternalValueRef.current = false;
+          }
+        });
+      } catch (err) {
+        const message = err?.message || String(err);
+        console.error('Failed to load Vditor:', err);
+        setVditorError(message);
+        setMarkdownEditorMode('plain');
       }
+    };
 
-      const result = await response.json();
-      console.log('Save successful:', result);
+    init();
+    return () => { cancelled = true; };
+  }, [isMarkdownFile, markdownEditorMode, isActive, file.path]);
 
+  useEffect(() => {
+    if (!isMarkdownFile) return;
+    if (markdownEditorMode !== 'vditor') return;
+    if (!isActive) return;
+    const instance = vditorInstanceRef.current;
+    if (!instance?.getValue || !instance?.setValue) return;
+
+    const currentValue = instance.getValue();
+    if (currentValue === content) return;
+
+    vditorApplyingExternalValueRef.current = true;
+    instance.setValue(content || '');
+    vditorApplyingExternalValueRef.current = false;
+  }, [content, isMarkdownFile, markdownEditorMode, isActive]);
+
+  const reloadFromDisk = async () => {
+    try {
+      setLoading(true);
+      const response = await api.readFile(file.projectName, file.path);
+      if (!response.ok) {
+        throw new Error(`Failed to reload file: ${response.status} ${response.statusText}`);
+      }
+      const data = await response.json();
+      setContent(data.content);
+      setSavedContent(data.content);
+      setBaselineMtimeMs(data.mtimeMs ?? null);
+      setAutoSaveBlocked(false);
+      setShowAutoSaveNotice(false);
+      return true;
+    } catch (error) {
+      console.error('Error reloading file:', error);
+      alert(`Error reloading file: ${error.message}`);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveToDisk = async ({ force = false, showSuccessFeedback = true } = {}) => {
+    const response = await api.saveFile(file.projectName, file.path, content, {
+      expectedMtimeMs: baselineMtimeMs,
+      force,
+    });
+
+    if (response.status === 409) {
+      const errorData = await response.json().catch(() => ({}));
+      return { conflict: true, ...errorData };
+    }
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Save failed: ${response.status}`);
+      }
+      const textError = await response.text();
+      console.error('Non-JSON error response:', textError);
+      throw new Error(`Save failed: ${response.status} ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    setBaselineMtimeMs(result.mtimeMs ?? baselineMtimeMs);
+    setSavedContent(content);
+    setAutoSaveBlocked(false);
+    setShowAutoSaveNotice(false);
+
+    if (showSuccessFeedback) {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
+    }
 
+    return { success: true };
+  };
+
+  const saveWithConflictHandling = async (trigger) => {
+    if (!isDirty) return true;
+    if (saving) return false;
+
+    setSaving(true);
+    let saveResult;
+    try {
+      saveResult = await saveToDisk({ force: false, showSuccessFeedback: trigger === 'manual' });
     } catch (error) {
       console.error('Error saving file:', error);
       alert(`Error saving file: ${error.message}`);
-    } finally {
       setSaving(false);
+      return false;
     }
+    setSaving(false);
+
+    if (!saveResult?.conflict) return true;
+
+    // Autosave: non-blocking notice only; stop this autosave
+    if (trigger === 'auto') {
+      setAutoSaveBlocked(true);
+      setShowAutoSaveNotice(true);
+      return false;
+    }
+
+    const choice = await promptConflictResolution();
+
+    if (choice === 'reload') {
+      await reloadFromDisk();
+      return true;
+    }
+
+    if (choice === 'overwrite') {
+      setSaving(true);
+      try {
+        await saveToDisk({ force: true, showSuccessFeedback: trigger === 'manual' });
+        return true;
+      } catch (error) {
+        console.error('Error overwriting file:', error);
+        alert(`Error overwriting file: ${error.message}`);
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    }
+
+    // cancel: do not write, keep dirty/content
+    return false;
   };
+
+  const handleSave = async () => {
+    await saveWithConflictHandling('manual');
+  };
+
+  const handleRequestClose = async () => {
+    if (!isDirty) return onClose();
+    const ok = await saveWithConflictHandling('close');
+    if (ok) onClose();
+  };
+
+  useImperativeHandle(ref, () => ({
+    prepareForSwitch: async () => {
+      if (!isDirty) return true;
+      return await saveWithConflictHandling('switch');
+    },
+    hasUnsavedChanges: () => isDirty,
+  }));
 
   const handleDownload = () => {
     const blob = new Blob([content], { type: 'text/plain' });
@@ -432,6 +651,7 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
 
   // Handle keyboard shortcuts
   useEffect(() => {
+    if (!isActive) return;
     const handleKeyDown = (e) => {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 's') {
@@ -439,14 +659,31 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
           handleSave();
         } else if (e.key === 'Escape') {
           e.preventDefault();
-          onClose();
+          handleRequestClose();
         }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [content]);
+  }, [content, isActive, isDirty, saving]);
+
+  // Debounced autosave (no modal on conflict)
+  useEffect(() => {
+    if (!isActive) return;
+    if (!isDirty) return;
+    if (saving) return;
+    if (autoSaveBlocked) return;
+    if (file.diffInfo) return; // avoid autosaving diff-based suggested content
+    if (baselineMtimeMs === null) return;
+
+    clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      saveWithConflictHandling('auto');
+    }, 1200);
+
+    return () => clearTimeout(autosaveTimerRef.current);
+  }, [content, isDirty, saving, autoSaveBlocked, file.diffInfo, baselineMtimeMs, isActive]);
 
   if (loading) {
     return (
@@ -573,7 +810,7 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 min-w-0">
-                <h3 className="font-medium text-gray-900 dark:text-white truncate">{file.name}</h3>
+                <h3 className="font-medium text-gray-900 dark:text-white truncate">{file.name}{isDirty ? ' *' : ''}</h3>
                 {file.diffInfo && (
                   <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-300 px-2 py-1 rounded whitespace-nowrap">
                     {t('header.showingChanges')}
@@ -585,6 +822,24 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
           </div>
 
           <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+            {isMarkdownFile && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (markdownEditorMode === 'vditor') {
+                    destroyVditor();
+                    setMarkdownEditorMode('plain');
+                  } else {
+                    setVditorError(null);
+                    setMarkdownEditorMode('vditor');
+                  }
+                }}
+                className="px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+                title={markdownEditorMode === 'vditor' ? t('markdown.switchToPlainText') : t('markdown.openWithVditor')}
+              >
+                {markdownEditorMode === 'vditor' ? t('markdown.plainText') : 'Vditor'}
+              </button>
+            )}
             <button
               onClick={handleDownload}
               className="p-2 md:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
@@ -628,7 +883,7 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
             )}
 
             <button
-              onClick={onClose}
+              onClick={handleRequestClose}
               className="p-2 md:p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 flex items-center justify-center"
               title={t('actions.close')}
             >
@@ -637,52 +892,79 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
           </div>
         </div>
 
+        {vditorError && (
+          <div className="px-4 py-2 text-sm bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 border-b border-border">
+            {t('markdown.vditorLoadFailed', { error: vditorError })}
+          </div>
+        )}
+
+        {autoSaveBlocked && showAutoSaveNotice && (
+          <div className="px-4 py-2 border-b border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-900/20 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 text-yellow-700 dark:text-yellow-300" />
+            <div className="flex-1 text-sm text-yellow-900 dark:text-yellow-100">
+              <div className="font-medium">{t('conflict.autosaveSkippedTitle')}</div>
+              <div>{t('conflict.autosaveSkippedBody')}</div>
+            </div>
+            <button
+              onClick={() => setShowAutoSaveNotice(false)}
+              className="p-1 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/40"
+              title={t('actions.close')}
+            >
+              <X className="w-4 h-4 text-yellow-900 dark:text-yellow-100" />
+            </button>
+          </div>
+        )}
+
         {/* Editor */}
         <div className="flex-1 overflow-hidden">
-          <CodeMirror
-            ref={editorRef}
-            value={content}
-            onChange={setContent}
-            extensions={[
-              ...getLanguageExtension(file.name),
-              // Always show the toolbar
-              ...editorToolbarPanel,
-              // Only show diff-related extensions when diff is enabled
-              ...(file.diffInfo && showDiff && file.diffInfo.old_string !== undefined
-                ? [
-                    unifiedMergeView({
-                      original: file.diffInfo.old_string,
-                      mergeControls: false,
-                      highlightChanges: true,
-                      syntaxHighlightDeletions: false,
-                      gutter: true
-                      // NOTE: NO collapseUnchanged - this shows the full file!
-                    }),
-                    ...minimapExtension,
-                    ...scrollToFirstChunkExtension
-                  ]
-                : []),
-              ...(wordWrap ? [EditorView.lineWrapping] : [])
-            ]}
-            theme={isDarkMode ? oneDark : undefined}
-            height="100%"
-            style={{
-              fontSize: `${fontSize}px`,
-              height: '100%',
-            }}
-            basicSetup={{
-              lineNumbers: showLineNumbers,
-              foldGutter: true,
-              dropCursor: false,
-              allowMultipleSelections: false,
-              indentOnInput: true,
-              bracketMatching: true,
-              closeBrackets: true,
-              autocompletion: true,
-              highlightSelectionMatches: true,
-              searchKeymap: true,
-            }}
-          />
+          {isMarkdownFile && markdownEditorMode === 'vditor' ? (
+            <div id={vditorIdRef.current} className="h-full w-full" />
+          ) : (
+            <CodeMirror
+              ref={editorRef}
+              value={content}
+              onChange={setContent}
+              extensions={[
+                ...getLanguageExtension(file.name),
+                // Always show the toolbar
+                ...editorToolbarPanel,
+                // Only show diff-related extensions when diff is enabled
+                ...(file.diffInfo && showDiff && file.diffInfo.old_string !== undefined
+                  ? [
+                      unifiedMergeView({
+                        original: file.diffInfo.old_string,
+                        mergeControls: false,
+                        highlightChanges: true,
+                        syntaxHighlightDeletions: false,
+                        gutter: true
+                        // NOTE: NO collapseUnchanged - this shows the full file!
+                      }),
+                      ...minimapExtension,
+                      ...scrollToFirstChunkExtension
+                    ]
+                  : []),
+                ...(wordWrap ? [EditorView.lineWrapping] : [])
+              ]}
+              theme={isDarkMode ? oneDark : undefined}
+              height="100%"
+              style={{
+                fontSize: `${fontSize}px`,
+                height: '100%',
+              }}
+              basicSetup={{
+                lineNumbers: showLineNumbers,
+                foldGutter: true,
+                dropCursor: false,
+                allowMultipleSelections: false,
+                indentOnInput: true,
+                bracketMatching: true,
+                closeBrackets: true,
+                autocompletion: true,
+                highlightSelectionMatches: true,
+                searchKeymap: true,
+              }}
+            />
+          )}
         </div>
 
         {/* Footer */}
@@ -698,8 +980,52 @@ function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded 
         </div>
       </div>
     </div>
+
+    {conflictDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => resolveConflictDialog('cancel')} />
+        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+          <div className="p-6">
+            <div className="flex items-center mb-4">
+              <div className="p-2 rounded-full mr-3 bg-yellow-100 dark:bg-yellow-900">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+              </div>
+              <h3 className="text-lg font-semibold">{t('conflict.title')}</h3>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              {t('conflict.message')}
+            </p>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-6 space-y-2">
+              <div>• {t('conflict.reloadWarning')}</div>
+              <div>• {t('conflict.overwriteWarning')}</div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => resolveConflictDialog('cancel')}
+                className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+              >
+                {t('conflict.cancel')}
+              </button>
+              <button
+                onClick={() => resolveConflictDialog('reload')}
+                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+              >
+                {t('conflict.reload')}
+              </button>
+              <button
+                onClick={() => resolveConflictDialog('overwrite')}
+                className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-md"
+              >
+                {t('conflict.overwrite')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
-}
+});
 
 export default CodeEditor;
