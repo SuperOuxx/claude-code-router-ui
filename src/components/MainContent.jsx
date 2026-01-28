@@ -72,6 +72,7 @@ function MainContent({
   const [isResizing, setIsResizing] = useState(false);
   const [editorExpanded, setEditorExpanded] = useState(true); // Start expanded by default
   const resizeRef = useRef(null);
+  const chatResizeRef = useRef(null);
   const codeEditorRef = useRef(null);
 
   // Session dropdown state
@@ -637,22 +638,35 @@ function MainContent({
         </div>
 
         {/* Right Column: Chat Interface - Resizable width */}
-        <div className={`min-w-[300px] flex-shrink-0 border-l border-gray-200 dark:border-gray-700 ${activeTab === 'chat' ? 'block' : 'hidden'}`} style={{ width: chatWidth }}>
+        <div
+          ref={chatResizeRef}
+          className={`min-w-[250px] flex-shrink-0 border-l border-gray-200 dark:border-gray-700 ${activeTab === 'chat' ? 'flex' : 'hidden'}`}
+          style={{ width: chatWidth }}
+        >
           <div className="h-full overflow-hidden flex flex-col relative">
             {/* Resize Handle */}
             <div
-              className="absolute left-0 top-0 bottom-0 w-1 bg-transparent hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors group z-10"
+              className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors group z-10 -ml-0.5"
               onMouseDown={(e) => {
+                e.preventDefault();
                 const startX = e.clientX;
-                const startWidth = e.currentTarget.parentElement.offsetWidth;
-                const chatPanel = e.currentTarget.parentElement;
+                const container = chatResizeRef.current?.parentElement;
+                if (!container) return;
+
+                const startWidth = chatResizeRef.current?.offsetWidth || 300;
+                const containerWidth = container.offsetWidth;
 
                 const handleMouseMove = (e) => {
-                  const newWidth = startWidth - (e.clientX - startX);
-                  const minWidth = 300;
-                  const maxWidth = 800;
+                  // Calculate new width: moving left increases width
+                  const deltaX = startX - e.clientX;
+                  const newWidth = startWidth + deltaX;
+
+                  // Dynamic min/max based on container width
+                  const minWidth = 250;
+                  const maxWidth = Math.min(900, containerWidth - 400); // Leave at least 400px for editor
+
                   if (newWidth >= minWidth && newWidth <= maxWidth) {
-                    chatPanel.style.width = `${newWidth}px`;
+                    setChatWidth(`${newWidth}px`);
                   }
                 };
 
@@ -661,9 +675,6 @@ function MainContent({
                   document.removeEventListener('mouseup', handleMouseUp);
                   document.body.style.cursor = '';
                   document.body.style.userSelect = '';
-                  // Persist the final width
-                  const finalWidth = chatPanel.style.width;
-                  setChatWidth(finalWidth || '500px');
                 };
 
                 document.addEventListener('mousemove', handleMouseMove);
@@ -672,7 +683,7 @@ function MainContent({
                 document.body.style.userSelect = 'none';
               }}
             >
-              <div className="absolute inset-y-0 left-0 w-0.5 bg-transparent group-hover:bg-blue-500 dark:group-hover:bg-blue-600 transition-colors" />
+              <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-transparent group-hover:bg-blue-500 dark:group-hover:bg-blue-600 transition-colors rounded-full" />
             </div>
             <ErrorBoundary showDetails={true}>
               <ChatInterface
