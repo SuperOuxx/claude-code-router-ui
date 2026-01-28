@@ -13,14 +13,15 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ChevronDown, Plus } from 'lucide-react';
 import ChatInterface from './ChatInterface';
-import FileTree from './FileTree';
 import CodeEditor from './CodeEditor';
 import StandaloneShell from './StandaloneShell';
 import GitPanel from './GitPanel';
 import ErrorBoundary from './ErrorBoundary';
 import ClaudeLogo from './ClaudeLogo';
 import CursorLogo from './CursorLogo';
+import CodexLogo from './CodexLogo';
 import TaskList from './TaskList';
 import TaskDetail from './TaskDetail';
 import PRDEditor from './PRDEditor';
@@ -28,6 +29,7 @@ import Tooltip from './Tooltip';
 import { useTaskMaster } from '../contexts/TaskMasterContext';
 import { useTasksSettings } from '../contexts/TasksSettingsContext';
 import { api } from '../utils/api';
+import { cn } from '../lib/utils';
 
 function MainContent({
   selectedProject,
@@ -57,18 +59,24 @@ function MainContent({
   showThinking,           // Show thinking/reasoning sections
   autoScrollToBottom,     // Auto-scroll to bottom when new messages arrive
   sendByCtrlEnter,        // Send by Ctrl+Enter mode for East Asian language input
-  externalMessageUpdate   // Trigger for external CLI updates to current session
+  externalMessageUpdate,  // Trigger for external CLI updates to current session
+  projects,               // All projects data
+  onNewSession            // Create new session handler
 }) {
   const { t } = useTranslation();
   const [editingFile, setEditingFile] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
-  const [editorWidth, setEditorWidth] = useState(600);
+  const [editorWidth, setEditorWidth] = useState(null); // null means fill available space
+  const [chatWidth, setChatWidth] = useState('500px');
   const [isResizing, setIsResizing] = useState(false);
-  const [editorExpanded, setEditorExpanded] = useState(false);
+  const [editorExpanded, setEditorExpanded] = useState(true); // Start expanded by default
   const resizeRef = useRef(null);
   const codeEditorRef = useRef(null);
-  
+
+  // Session dropdown state
+  const [showSessionDropdown, setShowSessionDropdown] = useState(false);
+
   // PRD Editor state
   const [showPRDEditor, setShowPRDEditor] = useState(false);
   const [selectedPRD, setSelectedPRD] = useState(null);
@@ -103,7 +111,7 @@ function MainContent({
         setExistingPRDs([]);
         return;
       }
-      
+
       try {
         const response = await api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`);
         if (response.ok) {
@@ -120,6 +128,28 @@ function MainContent({
 
     loadExistingPRDs();
   }, [currentProject?.name]);
+
+  // Helper function to get all sessions for selected project
+  const getAllSessions = () => {
+    if (!selectedProject || !projects) return [];
+
+    const project = projects.find(p => p.name === selectedProject.name);
+    if (!project) return [];
+
+    // Combine Claude, Cursor, and Codex sessions
+    const claudeSessions = (project.sessions || []).map(s => ({ ...s, __provider: 'claude' }));
+    const cursorSessions = (project.cursorSessions || []).map(s => ({ ...s, __provider: 'cursor' }));
+    const codexSessions = (project.codexSessions || []).map(s => ({ ...s, __provider: 'codex' }));
+
+    // Sort by most recent activity/date
+    const normalizeDate = (s) => {
+      if (s.__provider === 'cursor') return new Date(s.createdAt);
+      if (s.__provider === 'codex') return new Date(s.createdAt || s.lastActivity);
+      return new Date(s.lastActivity);
+    };
+
+    return [...claudeSessions, ...cursorSessions, ...codexSessions].sort((a, b) => normalizeDate(b) - normalizeDate(a));
+  };
 
   const handleFileOpen = async (filePath, diffInfo = null) => {
     // Create a file object that CodeEditor expects
@@ -148,7 +178,13 @@ function MainContent({
   };
 
   const handleToggleEditorExpand = () => {
-    setEditorExpanded(!editorExpanded);
+    const newExpanded = !editorExpanded;
+    setEditorExpanded(newExpanded);
+
+    // When collapsing, set a reasonable default width
+    if (!newExpanded && editorWidth === null) {
+      setEditorWidth(600);
+    }
   };
 
   const handleTaskClick = (task) => {
@@ -305,8 +341,9 @@ function MainContent({
       <div
         className="bg-background border-b border-border p-2 sm:p-3 pwa-header-safe flex-shrink-0"
       >
-        <div className="flex items-center justify-between relative">
-          <div className="flex items-center space-x-2 min-w-0 flex-1">
+        <div className="flex items-center justify-between relative gap-3">
+          {/* Left Side: Menu Button + Session Selector + Title */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {isMobile && (
               <button
                 onClick={onMenuClick}
@@ -321,52 +358,118 @@ function MainContent({
                 </svg>
               </button>
             )}
-            <div className="min-w-0 flex items-center gap-2 flex-1 overflow-x-auto scrollbar-hide">
-              {activeTab === 'chat' && selectedSession && (
-                <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
-                  {selectedSession.__provider === 'cursor' ? (
-                    <CursorLogo className="w-4 h-4" />
-                  ) : (
-                    <ClaudeLogo className="w-4 h-4" />
+
+            {/* Session Selector - Only show when project is selected and on chat tab */}
+            {selectedProject && activeTab === 'chat' && (
+              <div className="flex-shrink-0 hidden sm:block">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowSessionDropdown(!showSessionDropdown)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-sm bg-background border border-border rounded-md hover:bg-accent transition-colors min-w-[280px]"
+                  >
+                    {selectedSession ? (
+                      <>
+                        <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 bg-primary/10">
+                          {selectedSession.__provider === 'cursor' ? (
+                            <CursorLogo className="w-2.5 h-2.5" />
+                          ) : selectedSession.__provider === 'codex' ? (
+                            <CodexLogo className="w-2.5 h-2.5" />
+                          ) : (
+                            <ClaudeLogo className="w-2.5 h-2.5" />
+                          )}
+                        </div>
+                        <span className="truncate flex-1 text-left">
+                          {selectedSession.__provider === 'cursor'
+                            ? (selectedSession.name || 'Untitled Session')
+                            : (selectedSession.summary || 'New Session')}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">Select a session...</span>
+                    )}
+                    <ChevronDown className={cn(
+                      "w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform",
+                      showSessionDropdown && "transform rotate-180"
+                    )} />
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showSessionDropdown && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-10"
+                        onClick={() => setShowSessionDropdown(false)}
+                      />
+                      <div className="absolute z-20 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-64 overflow-y-auto left-0">
+                        {getAllSessions().length === 0 ? (
+                          <div className="p-3 text-sm text-muted-foreground text-center">
+                            No sessions yet
+                          </div>
+                        ) : (
+                          <>
+                            {getAllSessions().map((session) => {
+                              const isCursorSession = session.__provider === 'cursor';
+                              const isCodexSession = session.__provider === 'codex';
+                              const sessionName = isCursorSession
+                                ? (session.name || 'Untitled Session')
+                                : isCodexSession
+                                  ? (session.summary || session.name || 'Codex Session')
+                                  : (session.summary || 'New Session');
+
+                              return (
+                                <button
+                                  key={session.id}
+                                  onClick={() => {
+                                    onNavigateToSession(session.id);
+                                    setShowSessionDropdown(false);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center gap-2 p-2 text-sm text-left hover:bg-accent transition-colors",
+                                    selectedSession?.id === session.id && "bg-accent"
+                                  )}
+                                >
+                                  <div className={cn(
+                                    "w-4 h-4 rounded flex items-center justify-center flex-shrink-0",
+                                    selectedSession?.id === session.id ? "bg-primary/20" : "bg-muted/50"
+                                  )}>
+                                    {isCursorSession ? (
+                                      <CursorLogo className="w-2.5 h-2.5" />
+                                    ) : isCodexSession ? (
+                                      <CodexLogo className="w-2.5 h-2.5" />
+                                    ) : (
+                                      <ClaudeLogo className="w-2.5 h-2.5" />
+                                    )}
+                                  </div>
+                                  <span className="truncate flex-1">{sessionName}</span>
+                                </button>
+                              );
+                            })}
+                            {/* New Session Option */}
+                            <div className="border-t border-border">
+                              <button
+                                onClick={() => {
+                                  onNewSession(selectedProject);
+                                  setShowSessionDropdown(false);
+                                }}
+                                className="w-full flex items-center gap-2 p-2 text-sm text-primary hover:bg-accent transition-colors"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>New Session</span>
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
-              )}
-              <div className="min-w-0 flex-1">
-                {activeTab === 'chat' && selectedSession ? (
-                  <div className="min-w-0">
-                    <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap overflow-x-auto scrollbar-hide">
-                      {selectedSession.__provider === 'cursor' ? (selectedSession.name || 'Untitled Session') : (selectedSession.summary || 'New Session')}
-                    </h2>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {selectedProject.displayName}
-                    </div>
-                  </div>
-                ) : activeTab === 'chat' && !selectedSession ? (
-                  <div className="min-w-0">
-                    <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
-                      {t('mainContent.newSession')}
-                    </h2>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {selectedProject.displayName}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="min-w-0">
-                    <h2 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
-                      {activeTab === 'files' ? t('mainContent.projectFiles') :
-                       activeTab === 'git' ? t('tabs.git') :
-                       (activeTab === 'tasks' && shouldShowTasksTab) ? 'TaskMaster' :
-                       'Project'}
-                    </h2>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {selectedProject.displayName}
-                    </div>
-                  </div>
-                )}
               </div>
-            </div>
+            )}
+
+            {/* Title */}
+            
           </div>
-          
+
           {/* Modern Tab Navigation - Right Side */}
           <div className="flex-shrink-0 hidden sm:block">
             <div className="relative flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
@@ -401,23 +504,6 @@ function MainContent({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                     <span className="hidden md:hidden lg:inline">{t('tabs.shell')}</span>
-                  </span>
-                </button>
-              </Tooltip>
-              <Tooltip content={t('tabs.files')} position="bottom">
-                <button
-                  onClick={() => setActiveTab('files')}
-                  className={`relative px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${
-                    activeTab === 'files'
-                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <span className="flex items-center gap-1 sm:gap-1.5">
-                    <svg className="w-3 sm:w-3.5 h-3 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z" />
-                    </svg>
-                    <span className="hidden md:hidden lg:inline">{t('tabs.files')}</span>
                   </span>
                 </button>
               </Tooltip>
@@ -457,172 +543,165 @@ function MainContent({
                   </button>
                 </Tooltip>
               )}
-               {/* <button
-                onClick={() => setActiveTab('preview')}
-                className={`relative px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${
-                  activeTab === 'preview'
-                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
-                }`}
-              > 
-                <span className="flex items-center gap-1 sm:gap-1.5">
-                  <svg className="w-3 sm:w-3.5 h-3 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                  </svg>
-                  <span className="hidden sm:inline">Preview</span>
-                </span>
-              </button> */}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Content Area with Right Sidebar */}
+      {/* Three-Column Layout: Editor | Chat */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* Main Content */}
-        <div className={`flex-1 flex flex-col min-h-0 overflow-hidden ${editingFile ? 'mr-0' : ''} ${editorExpanded ? 'hidden' : ''}`}>
-          <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
-            <ErrorBoundary showDetails={true}>
-              <ChatInterface
-              selectedProject={selectedProject}
-              selectedSession={selectedSession}
-              ws={ws}
-              sendMessage={sendMessage}
-              messages={messages}
-              onFileOpen={handleFileOpen}
-              onInputFocusChange={onInputFocusChange}
-              onSessionActive={onSessionActive}
-              onSessionInactive={onSessionInactive}
-              onSessionProcessing={onSessionProcessing}
-              onSessionNotProcessing={onSessionNotProcessing}
-              processingSessions={processingSessions}
-              onReplaceTemporarySession={onReplaceTemporarySession}
-              onNavigateToSession={onNavigateToSession}
-              onShowSettings={onShowSettings}
-              autoExpandTools={autoExpandTools}
-              showRawParameters={showRawParameters}
-              showThinking={showThinking}
-              autoScrollToBottom={autoScrollToBottom}
-              sendByCtrlEnter={sendByCtrlEnter}
-              externalMessageUpdate={externalMessageUpdate}
-              onShowAllTasks={tasksEnabled ? () => setActiveTab('tasks') : null}
-            />
-          </ErrorBoundary>
-        </div>
-        {activeTab === 'files' && (
-          <div className="h-full overflow-hidden">
-            <FileTree selectedProject={selectedProject} />
-          </div>
-        )}
-        {activeTab === 'shell' && (
-          <div className="h-full w-full overflow-hidden">
-            <StandaloneShell
-              project={selectedProject}
-              session={selectedSession}
-              showHeader={false}
-            />
-          </div>
-        )}
-        {activeTab === 'git' && (
-          <div className="h-full overflow-hidden">
-            <GitPanel selectedProject={selectedProject} isMobile={isMobile} onFileOpen={handleFileOpen} />
-          </div>
-        )}
-        {shouldShowTasksTab && (
-          <div className={`h-full ${activeTab === 'tasks' ? 'block' : 'hidden'}`}>
-            <div className="h-full flex flex-col overflow-hidden">
-              <TaskList
-                tasks={tasks || []}
-                onTaskClick={handleTaskClick}
-                showParentTasks={true}
-                className="flex-1 overflow-y-auto p-4"
-                currentProject={currentProject}
-                onTaskCreated={refreshTasks}
-                onShowPRDEditor={(prd = null) => {
-                  setSelectedPRD(prd);
-                  setShowPRDEditor(true);
-                }}
-                existingPRDs={existingPRDs}
-                onRefreshPRDs={(showNotification = false) => {
-                  // Reload existing PRDs
-                  if (currentProject?.name) {
-                    api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`)
-                      .then(response => response.ok ? response.json() : Promise.reject())
-                      .then(data => {
-                        setExistingPRDs(data.prdFiles || []);
-                        if (showNotification) {
-                          setPRDNotification('PRD saved successfully!');
-                          setTimeout(() => setPRDNotification(null), 3000);
-                        }
-                      })
-                      .catch(error => console.error('Failed to refresh PRDs:', error));
-                  }
-                }}
-              />
-            </div>
-          </div>
-        )}
-        <div className={`h-full overflow-hidden ${activeTab === 'preview' ? 'block' : 'hidden'}`}>
-          {/* <LivePreviewPanel
-            selectedProject={selectedProject}
-            serverStatus={serverStatus}
-            serverUrl={serverUrl}
-            availableScripts={availableScripts}
-            onStartServer={(script) => {
-              sendMessage({
-                type: 'server:start',
-                projectPath: selectedProject?.fullPath,
-                script: script
-              });
-            }}
-            onStopServer={() => {
-              sendMessage({
-                type: 'server:stop',
-                projectPath: selectedProject?.fullPath
-              });
-            }}
-            onScriptSelect={setCurrentScript}
-            currentScript={currentScript}
-            isMobile={isMobile}
-            serverLogs={serverLogs}
-            onClearLogs={() => setServerLogs([])}
-          /> */}
-        </div>
-        </div>
-
-        {/* Code Editor Right Sidebar - Desktop only, Mobile uses modal */}
-        {editingFile && !isMobile && (
-          <>
-            {/* Resize Handle - Hidden when expanded */}
-            {!editorExpanded && (
-              <div
-                ref={resizeRef}
-                onMouseDown={handleMouseDown}
-                className="flex-shrink-0 w-1 bg-gray-200 dark:bg-gray-700 hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors relative group"
-                title="Drag to resize"
-              >
-                {/* Visual indicator on hover */}
-                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-1 bg-blue-500 dark:bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* Middle Column: Editor */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {editingFile && !isMobile ? (
+              <>
+                {/* Resize handle - only show when editor is not expanded */}
+                {!editorExpanded && (
+                  <div
+                    ref={resizeRef}
+                    onMouseDown={handleMouseDown}
+                    className="flex-shrink-0 w-1 bg-gray-200 dark:bg-gray-700 hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors relative group"
+                    title="Drag to resize"
+                  >
+                    <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-1 bg-blue-500 dark:bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                )}
+                {/* Editor container - fills available space when expanded */}
+                <div
+                  className={`h-full overflow-hidden ${editorExpanded ? 'flex-1' : ''}`}
+                  style={editorExpanded ? {} : { width: `${editorWidth}px` }}
+                >
+                  <CodeEditor
+                    ref={codeEditorRef}
+                    file={editingFile}
+                    onClose={handleCloseEditor}
+                    projectPath={selectedProject?.path}
+                    isSidebar={true}
+                    isExpanded={editorExpanded}
+                    onToggleExpand={handleToggleEditorExpand}
+                  />
+                </div>
+              </>
+            ) : activeTab === 'shell' ? (
+              <div className="h-full w-full overflow-hidden">
+                <StandaloneShell
+                  project={selectedProject}
+                  session={selectedSession}
+                  showHeader={false}
+                />
+              </div>
+            ) : activeTab === 'git' ? (
+              <div className="h-full overflow-hidden">
+                <GitPanel selectedProject={selectedProject} isMobile={isMobile} onFileOpen={handleFileOpen} />
+              </div>
+            ) : shouldShowTasksTab && activeTab === 'tasks' ? (
+              <div className="h-full flex flex-col overflow-hidden">
+                <TaskList
+                  tasks={tasks || []}
+                  onTaskClick={handleTaskClick}
+                  showParentTasks={true}
+                  className="flex-1 overflow-y-auto p-4"
+                  currentProject={currentProject}
+                  onTaskCreated={refreshTasks}
+                  onShowPRDEditor={(prd = null) => {
+                    setSelectedPRD(prd);
+                    setShowPRDEditor(true);
+                  }}
+                  existingPRDs={existingPRDs}
+                  onRefreshPRDs={(showNotification = false) => {
+                    if (currentProject?.name) {
+                      api.get(`/taskmaster/prd/${encodeURIComponent(currentProject.name)}`)
+                        .then(response => response.ok ? response.json() : Promise.reject())
+                        .then(data => {
+                          setExistingPRDs(data.prdFiles || []);
+                          if (showNotification) {
+                            setPRDNotification('PRD saved successfully!');
+                            setTimeout(() => setPRDNotification(null), 3000);
+                          }
+                        })
+                        .catch(error => console.error('Failed to refresh PRDs:', error));
+                    }
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-gray-500 dark:text-gray-400">
+                  <svg className="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <p className="text-lg font-medium">No file selected</p>
+                  <p className="text-sm mt-2">Select a file from the tree to view its contents</p>
+                </div>
               </div>
             )}
+        </div>
 
-            {/* Editor Sidebar */}
+        {/* Right Column: Chat Interface - Resizable width */}
+        <div className={`min-w-[300px] flex-shrink-0 border-l border-gray-200 dark:border-gray-700 ${activeTab === 'chat' ? 'block' : 'hidden'}`} style={{ width: chatWidth }}>
+          <div className="h-full overflow-hidden flex flex-col relative">
+            {/* Resize Handle */}
             <div
-              className={`flex-shrink-0 border-l border-gray-200 dark:border-gray-700 h-full overflow-hidden ${editorExpanded ? 'flex-1' : ''}`}
-              style={editorExpanded ? {} : { width: `${editorWidth}px` }}
+              className="absolute left-0 top-0 bottom-0 w-1 bg-transparent hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors group z-10"
+              onMouseDown={(e) => {
+                const startX = e.clientX;
+                const startWidth = e.currentTarget.parentElement.offsetWidth;
+                const chatPanel = e.currentTarget.parentElement;
+
+                const handleMouseMove = (e) => {
+                  const newWidth = startWidth - (e.clientX - startX);
+                  const minWidth = 300;
+                  const maxWidth = 800;
+                  if (newWidth >= minWidth && newWidth <= maxWidth) {
+                    chatPanel.style.width = `${newWidth}px`;
+                  }
+                };
+
+                const handleMouseUp = () => {
+                  document.removeEventListener('mousemove', handleMouseMove);
+                  document.removeEventListener('mouseup', handleMouseUp);
+                  document.body.style.cursor = '';
+                  document.body.style.userSelect = '';
+                  // Persist the final width
+                  const finalWidth = chatPanel.style.width;
+                  setChatWidth(finalWidth || '500px');
+                };
+
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+              }}
             >
-              <CodeEditor
-                ref={codeEditorRef}
-                file={editingFile}
-                onClose={handleCloseEditor}
-                projectPath={selectedProject?.path}
-                isSidebar={true}
-                isExpanded={editorExpanded}
-                onToggleExpand={handleToggleEditorExpand}
-              />
+              <div className="absolute inset-y-0 left-0 w-0.5 bg-transparent group-hover:bg-blue-500 dark:group-hover:bg-blue-600 transition-colors" />
             </div>
-          </>
-        )}
+            <ErrorBoundary showDetails={true}>
+              <ChatInterface
+                selectedProject={selectedProject}
+                selectedSession={selectedSession}
+                ws={ws}
+                sendMessage={sendMessage}
+                messages={messages}
+                onFileOpen={handleFileOpen}
+                onInputFocusChange={onInputFocusChange}
+                onSessionActive={onSessionActive}
+                onSessionInactive={onSessionInactive}
+                onSessionProcessing={onSessionProcessing}
+                onSessionNotProcessing={onSessionNotProcessing}
+                processingSessions={processingSessions}
+                onReplaceTemporarySession={onReplaceTemporarySession}
+                onNavigateToSession={onNavigateToSession}
+                onShowSettings={onShowSettings}
+                autoExpandTools={autoExpandTools}
+                showRawParameters={showRawParameters}
+                showThinking={showThinking}
+                autoScrollToBottom={autoScrollToBottom}
+                sendByCtrlEnter={sendByCtrlEnter}
+                externalMessageUpdate={externalMessageUpdate}
+                onShowAllTasks={tasksEnabled ? () => setActiveTab('tasks') : null}
+              />
+            </ErrorBoundary>
+          </div>
+        </div>
       </div>
 
       {/* Code Editor Modal for Mobile */}

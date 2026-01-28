@@ -306,7 +306,7 @@ function FileTree({ selectedProject }) {
     }
   };
 
-  // Render detailed view with table-like layout
+  // Render detailed view with table-like layout - Name column only
   const renderDetailedView = (items, level = 0) => {
     return items.map((item) => (
       <div key={item.path} className="select-none">
@@ -350,7 +350,7 @@ function FileTree({ selectedProject }) {
             });
           }}
         >
-          <div className="col-span-5 flex items-center gap-2 min-w-0">
+          <div className="col-span-12 flex items-center gap-2 min-w-0">
             {item.type === 'directory' ? (
               expandedDirs.has(item.path) ? (
                 <FolderOpen className="w-4 h-4 text-blue-500 flex-shrink-0" />
@@ -364,32 +364,23 @@ function FileTree({ selectedProject }) {
               {item.name}
             </span>
           </div>
-          <div className="col-span-2 text-sm text-muted-foreground">
-            {item.type === 'file' ? formatFileSize(item.size) : '-'}
-          </div>
-          <div className="col-span-3 text-sm text-muted-foreground">
-            {formatRelativeTime(item.modified)}
-          </div>
-          <div className="col-span-2 text-sm text-muted-foreground font-mono">
-            {item.permissionsRwx || '-'}
-          </div>
         </div>
-        
-        {item.type === 'directory' && 
-         expandedDirs.has(item.path) && 
-         item.children && 
+
+        {item.type === 'directory' &&
+         expandedDirs.has(item.path) &&
+         item.children &&
          renderDetailedView(item.children, level + 1)}
       </div>
     ));
   };
 
-  // Render compact view with inline details
+  // Render compact view - Name column only
   const renderCompactView = (items, level = 0) => {
     return items.map((item) => (
       <div key={item.path} className="select-none">
         <div
           className={cn(
-            "flex items-center justify-between p-2 hover:bg-accent cursor-pointer",
+            "flex items-center p-2 hover:bg-accent cursor-pointer",
           )}
           style={{ paddingLeft: `${level * 16 + 12}px` }}
           onClick={() => {
@@ -441,19 +432,11 @@ function FileTree({ selectedProject }) {
               {item.name}
             </span>
           </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            {item.type === 'file' && (
-              <>
-                <span>{formatFileSize(item.size)}</span>
-                <span className="font-mono">{item.permissionsRwx}</span>
-              </>
-            )}
-          </div>
         </div>
-        
-        {item.type === 'directory' && 
-         expandedDirs.has(item.path) && 
-         item.children && 
+
+        {item.type === 'directory' &&
+         expandedDirs.has(item.path) &&
+         item.children &&
          renderCompactView(item.children, level + 1)}
       </div>
     ));
@@ -529,18 +512,6 @@ function FileTree({ selectedProject }) {
           )}
         </div>
       </div>
-
-      {/* Column Headers for Detailed View */}
-      {viewMode === 'detailed' && filteredFiles.length > 0 && (
-        <div className="px-4 pt-2 pb-1 border-b border-border">
-          <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
-            <div className="col-span-5">{t('fileTree.name')}</div>
-            <div className="col-span-2">{t('fileTree.size')}</div>
-            <div className="col-span-3">{t('fileTree.modified')}</div>
-            <div className="col-span-2">{t('fileTree.permissions')}</div>
-          </div>
-        </div>
-      )}
 
       <ScrollArea className="flex-1 p-4">
         {files.length === 0 ? (
