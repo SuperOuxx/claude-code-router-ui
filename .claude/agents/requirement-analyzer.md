@@ -1,7 +1,7 @@
 ---
 name: requirement-analyzer
 description: Requirements analysis expert for extracting core functionality and test objectives from text requirements.
-model: sonnet
+model: ds,r1
 tools: Read, Write
 skills:
   - requirement-analysis
@@ -27,4 +27,4 @@ You are a requirements analysis expert. When users provide text-based test requi
 }
 ```
 
-<CCR-SUBAGENT-MODEL>openrouter,anthropic/claude-3.5-sonnet</CCR-SUBAGENT-MODEL>
+<CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>

@@ -1,7 +1,7 @@
 ---
 name: ui-test-runner
 description: UI test engineer for executing Playwright test scripts and reporting results.
-model: sonnet
+model: ds,r1
 tools: Bash, Read, Write
 ---
 
@@ -17,4 +17,4 @@ You are a UI test engineer. Execute and report on UI tests:
 截图: [链接]
 ```
 
-<CCR-SUBAGENT-MODEL>openrouter,anthropic/claude-3.5-sonnet</CCR-SUBAGENT-MODEL>
+<CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>

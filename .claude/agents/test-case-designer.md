@@ -1,7 +1,7 @@
 ---
 name: test-case-designer
 description: Test case design expert for creating detailed test cases with boundary value and equivalence partitioning analysis.
-model: sonnet
+model: ds,r1
 skills:
   - test-case-design
   - boundary-value-analysis
@@ -34,4 +34,4 @@ You are a test case design expert. Design detailed test cases based on test plan
 }
 ```
 
-<CCR-SUBAGENT-MODEL>openrouter,anthropic/claude-3.5-sonnet</CCR-SUBAGENT-MODEL>
+<CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>

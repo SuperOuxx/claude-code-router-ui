@@ -13,7 +13,7 @@ graph TD
     D --> E
     E --> F[test-case-designer<br/>设计测试用例]
     F --> G[test-data-generator<br/>数据库MCP生成数据]
-    G --> H[gherkin-generator<br/>转换Gherkin语法]
+    G --> H[bdd-test-expert<br/>生成BDD feature文件]
     H --> I[ui-test-runner<br/>Playwright MCP执行测试]
 ```
 
@@ -199,8 +199,8 @@ graph TD
 
 ---
 
-### 6. 🥒 gherkin-generator（Gherkin代码生成器）
-**文件**: `gherkin-generator.md`
+### 6. 🥒 bdd-test-expert（Gherkin代码生成器）
+**文件**: `bdd-test-expert.md`
 
 **用途**: 将测试用例转换为标准的 Gherkin 语法
 
@@ -228,7 +228,7 @@ Feature: 用户登录
 
 **使用示例**:
 ```bash
-@gherkin-generator 将TC001转换为Gherkin语法
+@bdd-test-expert 将TC001转换为Gherkin语法
 ```
 
 ---
@@ -350,7 +350,7 @@ DATABASE_URL=postgresql://localhost:5432/testdb
 # 输出: 10组测试数据
 
 # 步骤5: 转换为Gherkin
-@gherkin-generator 将测试用例转换为.feature文件
+@bdd-test-expert 将测试用例转换为.feature文件
 # 输出: login.feature 文件
 
 # 步骤6: 执行UI测试（后台运行）
@@ -380,7 +380,7 @@ DATABASE_URL=postgresql://localhost:5432/testdb
 │   ├── test-planner.md             # 测试计划员
 │   ├── test-case-designer.md       # 测试用例设计师
 │   ├── test-data-generator.md      # 测试数据生成器
-│   ├── gherkin-generator.md        # Gherkin生成器
+│   ├── bdd-test-expert.md        # Gherkin生成器
 │   ├── ui-test-runner.md           # UI测试执行官
 │   └── README.md                   # 本文件
 ├── skills/                          # 技能库

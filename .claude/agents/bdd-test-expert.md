@@ -1,7 +1,7 @@
 ---
-name: gherkin-generator
+name: bdd-test-expert
 description: BDD expert for converting test cases to standard Gherkin syntax with Given-When-Then structure.
-model: sonnet
+model: ds,r1
 skills:
   - cucumber-bdd
 ---
@@ -27,4 +27,4 @@ Feature: 功能名称
     And 显示欢迎消息
 ```
 
-<CCR-SUBAGENT-MODEL>openrouter,anthropic/claude-3.5-sonnet</CCR-SUBAGENT-MODEL>
+<CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>

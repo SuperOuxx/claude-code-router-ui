@@ -148,7 +148,7 @@ ls -la .claude/mcp/
 @test-data-generator 为登录功能生成10组测试数据，包括边界值
 
 # 5️⃣ 转换为Gherkin
-@gherkin-generator 将测试用例转换为Gherkin格式的.feature文件
+@bdd-test-expert 将测试用例转换为Gherkin格式的.feature文件
 
 # 6️⃣ 执行测试（后台运行，Ctrl+B）
 @ui-test-runner 执行登录功能的UI自动化测试

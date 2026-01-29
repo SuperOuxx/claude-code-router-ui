@@ -101,7 +101,7 @@ permissionMode: auto
 ```
 **编辑文件**：`~/.claude/agents/test-data-generator.md`
 ```markdown
-<CCR-SUBAGENT-MODEL>openrouter,deepseek/deepseek-reasoner</CCR-SUBAGENT-MODEL>
+<CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>
 ---
 tools:
   - name: database-mcp
@@ -135,7 +135,7 @@ skills:
 ```
 **编辑文件**：`~/.claude/agents/ui-test-runner.md`
 ```markdown
-<CCR-SUBAGENT-MODEL>openrouter,anthropic/claude-3.5-sonnet</CCR-SUBAGENT-MODEL>
+<CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>
 ---
 tools:
   - name: playwright-mcp

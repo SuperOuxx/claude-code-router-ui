@@ -1,7 +1,7 @@
 ---
 name: test-data-generator
 description: Test data expert for generating test data with boundary values using database tools.
-model: sonnet
+model: ds,r1
 tools: Read, Write, Bash
 skills:
   - boundary-value-analysis
@@ -22,4 +22,4 @@ You are a test data expert. Generate test data based on test cases:
 }
 ```
 
-<CCR-SUBAGENT-MODEL>openrouter,deepseek/deepseek-reasoner</CCR-SUBAGENT-MODEL>
+<CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>

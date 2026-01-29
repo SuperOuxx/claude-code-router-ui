@@ -13,7 +13,7 @@ graph TD
     D --> E
     E --> F[🎯 test-case-designer<br/>设计测试用例]
     F --> G[🔢 test-data-generator<br/>数据库MCP生成数据]
-    G --> H[🥒 gherkin-generator<br/>转换Gherkin语法]
+    G --> H[🥒 bdd-test-expert<br/>转换Gherkin语法]
     H --> I[🎭 ui-test-runner<br/>Playwright MCP执行测试]
 ```
 
@@ -28,7 +28,7 @@ graph TD
 | 📋 test-planner | DeepSeek Reasoner | 测试计划制定 | 需求文档 | 测试策略和排期 |
 | 🎯 test-case-designer | Claude 3.5 Sonnet | 测试用例设计 | 测试计划 | 详细测试用例 |
 | 🔢 test-data-generator | DeepSeek Reasoner | 测试数据生成 | 测试用例 | 测试数据集 |
-| 🥒 gherkin-generator | Claude 3.5 Sonnet | Gherkin代码生成 | 测试用例 | .feature文件 |
+| 🥒 bdd-test-expert | Claude 3.5 Sonnet | Gherkin代码生成 | 测试用例 | .feature文件 |
 | 🎭 ui-test-runner | Claude 3.5 Sonnet | UI测试执行 | Gherkin脚本 | 测试报告和截图 |
 
 ### 2. Skills（专业技能库）
@@ -40,7 +40,7 @@ graph TD
 | test-case-design | 测试用例设计 | test-case-designer |
 | boundary-value-analysis | 边界值分析 | test-case-designer, test-data-generator |
 | equivalence-partitioning | 等价类划分 | test-case-designer, test-data-generator |
-| cucumber-bdd | BDD测试方法 | gherkin-generator, ui-test-runner |
+| cucumber-bdd | BDD测试方法 | bdd-test-expert, ui-test-runner |
 
 ### 3. MCP 服务（扩展能力）
 
@@ -62,7 +62,7 @@ claude-code-router-ui/
 │   │   ├── test-planner.md              # 📋 测试计划员
 │   │   ├── test-case-designer.md        # 🎯 测试用例设计师
 │   │   ├── test-data-generator.md       # 🔢 测试数据生成器
-│   │   ├── gherkin-generator.md         # 🥒 Gherkin生成器
+│   │   ├── bdd-test-expert.md         # 🥒 Gherkin生成器
 │   │   └── ui-test-runner.md            # 🎭 UI测试执行官
 │   ├── skills/                           # 技能库目录
 │   │   ├── requirement-analysis.md       # 需求分析技能
@@ -192,7 +192,7 @@ claude-code mcp list
 # → 输出: {"test_data": [...]}
 
 # 步骤 5: 转换为Gherkin
-@gherkin-generator 转换为.feature文件
+@bdd-test-expert 转换为.feature文件
 # → 输出: Feature: ... Scenario: ...
 
 # 步骤 6: 执行测试

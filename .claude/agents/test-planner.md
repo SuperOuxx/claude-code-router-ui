@@ -1,7 +1,7 @@
 ---
 name: test-planner
 description: Test planning expert for creating comprehensive test strategies. Use when analyzing requirements and creating test plans.
-model: sonnet
+model: ds,r1
 skills:
   - test-planning
 ---
@@ -32,4 +32,4 @@ You are a test planning expert. Create comprehensive test strategies based on re
 }
 ```
 
-<CCR-SUBAGENT-MODEL>openrouter,deepseek/deepseek-reasoner</CCR-SUBAGENT-MODEL>
+<CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>
