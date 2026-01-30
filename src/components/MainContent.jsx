@@ -11,7 +11,7 @@
  * No session protection logic is implemented here - it's purely a props bridge.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Plus } from 'lucide-react';
 import ChatInterface from './ChatInterface';
@@ -30,6 +30,9 @@ import { useTaskMaster } from '../contexts/TaskMasterContext';
 import { useTasksSettings } from '../contexts/TasksSettingsContext';
 import { api } from '../utils/api';
 import { cn } from '../lib/utils';
+
+const CHAT_PANEL_DEFAULT_WIDTH = 500;
+const CHAT_PANEL_MIN_WIDTH = 250;
 
 function MainContent({
   selectedProject,
@@ -68,11 +71,13 @@ function MainContent({
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [editorWidth, setEditorWidth] = useState(null); // null means fill available space
-  const [chatWidth, setChatWidth] = useState('500px');
+  const [chatWidth, setChatWidth] = useState(CHAT_PANEL_DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
+  const [isChatResizing, setIsChatResizing] = useState(false);
   const [editorExpanded, setEditorExpanded] = useState(true); // Start expanded by default
   const resizeRef = useRef(null);
   const chatResizeRef = useRef(null);
+  const chatResizeMetrics = useRef(null);
   const codeEditorRef = useRef(null);
 
   // Session dropdown state
@@ -220,6 +225,24 @@ function MainContent({
     e.preventDefault();
   };
 
+  const handleChatResizeMouseDown = useCallback((event) => {
+    if (isMobile) return;
+
+    event.preventDefault();
+
+    const container = chatResizeRef.current?.parentElement;
+    if (!container) return;
+
+    const { right, width } = container.getBoundingClientRect();
+
+    chatResizeMetrics.current = {
+      containerRight: right,
+      containerWidth: width
+    };
+
+    setIsChatResizing(true);
+  }, [isMobile]);
+
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isResizing) return;
@@ -257,6 +280,40 @@ function MainContent({
       document.body.style.userSelect = '';
     };
   }, [isResizing]);
+
+  useEffect(() => {
+    if (!isChatResizing) return;
+
+    const handleMouseMove = (event) => {
+      if (!chatResizeMetrics.current) return;
+
+      const { containerRight, containerWidth } = chatResizeMetrics.current;
+      const nextWidth = containerRight - event.clientX;
+      const clampedWidth = Math.max(
+        CHAT_PANEL_MIN_WIDTH,
+        Math.min(containerWidth, nextWidth)
+      );
+
+      setChatWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsChatResizing(false);
+      chatResizeMetrics.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isChatResizing]);
 
   if (isLoading) {
     return (
@@ -550,9 +607,9 @@ function MainContent({
       </div>
 
       {/* Three-Column Layout: Editor | Chat */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden relative">
         {/* Middle Column: Editor */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ maxWidth: `calc(100% - ${chatWidth}px)` }}>
           {editingFile && !isMobile ? (
               <>
                 {/* Resize handle - only show when editor is not expanded */}
@@ -637,51 +694,23 @@ function MainContent({
             )}
         </div>
 
-        {/* Right Column: Chat Interface - Resizable width */}
+        {/* Right Column: Chat Interface - Fixed right edge, resizable width */}
         <div
           ref={chatResizeRef}
-          className={`min-w-[250px] flex-shrink-0 border-l border-gray-200 dark:border-gray-700 ${activeTab === 'chat' ? 'flex' : 'hidden'}`}
-          style={{ width: chatWidth }}
+          className={`min-w-[250px] border-l border-gray-200 dark:border-gray-700 ${activeTab === 'chat' ? 'flex' : 'hidden'}`}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: `${chatWidth}px`
+          }}
         >
           <div className="h-full overflow-hidden flex flex-col relative">
-            {/* Resize Handle */}
+            {/* Resize Handle - Left edge of chat panel */}
             <div
-              className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors group z-10 -ml-0.5"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                const startX = e.clientX;
-                const container = chatResizeRef.current?.parentElement;
-                if (!container) return;
-
-                const startWidth = chatResizeRef.current?.offsetWidth || 300;
-                const containerWidth = container.offsetWidth;
-
-                const handleMouseMove = (e) => {
-                  // Calculate new width: moving left increases width
-                  const deltaX = startX - e.clientX;
-                  const newWidth = startWidth + deltaX;
-
-                  // Dynamic min/max based on container width
-                  const minWidth = 250;
-                  const maxWidth = Math.min(900, containerWidth - 400); // Leave at least 400px for editor
-
-                  if (newWidth >= minWidth && newWidth <= maxWidth) {
-                    setChatWidth(`${newWidth}px`);
-                  }
-                };
-
-                const handleMouseUp = () => {
-                  document.removeEventListener('mousemove', handleMouseMove);
-                  document.removeEventListener('mouseup', handleMouseUp);
-                  document.body.style.cursor = '';
-                  document.body.style.userSelect = '';
-                };
-
-                document.addEventListener('mousemove', handleMouseMove);
-                document.addEventListener('mouseup', handleMouseUp);
-                document.body.style.cursor = 'col-resize';
-                document.body.style.userSelect = 'none';
-              }}
+              className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors group z-10"
+              onMouseDown={handleChatResizeMouseDown}
             >
               <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-transparent group-hover:bg-blue-500 dark:group-hover:bg-blue-600 transition-colors rounded-full" />
             </div>

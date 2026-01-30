@@ -12,7 +12,7 @@ graph TD
     C --> E[test-planner<br/>生成测试计划]
     D --> E
     E --> F[test-case-designer<br/>设计测试用例]
-    F --> G[test-data-generator<br/>数据库MCP生成数据]
+    F --> G[test-data-generator<br/>数据库MCP生成测试数据]
     G --> H[bdd-test-expert<br/>生成BDD feature文件]
     H --> I[ui-test-runner<br/>Playwright MCP执行测试]
 ```

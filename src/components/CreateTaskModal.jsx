@@ -32,10 +32,10 @@ const CreateTaskModal = ({ currentProject, onClose, onTaskCreated }) => {
               </div>
               <div className="flex-1">
                 <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
-                  💡 Pro Tip: Ask Claude Code Directly!
+                  💡 Pro Tip: Ask CCR Directly!
                 </h4>
                 <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                  You can simply ask Claude Code in the chat to create tasks for you. 
+                  You can simply ask CCR in the chat to create tasks for you. 
                   The AI assistant will automatically generate detailed tasks with research-backed insights.
                 </p>
                 
@@ -76,7 +76,7 @@ const CreateTaskModal = ({ currentProject, onClose, onTaskCreated }) => {
               onClick={onClose}
               className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
             >
-              Got it, I'll ask Claude Code directly
+              Got it, I'll ask CCR directly
             </button>
           </div>
         </div>

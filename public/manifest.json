@@ -1,7 +1,7 @@
 {
-  "name": "Claude Code UI",
-  "short_name": "Claude UI",
-  "description": "Claude Code UI web application",
+  "name": "CCR UI",
+  "short_name": "CCR",
+  "description": "CCR UI web application",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

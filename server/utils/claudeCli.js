@@ -1,6 +1,7 @@
 import { parse as parseShellCommand, quote as quoteShellCommand } from 'shell-quote';
 
-const CCR_COMMAND_REGEX = /(?:^|[\\/])ccr(?:\\.exe)?$/i;
+// Regex to match both ccr (claude-code-router) and official claude CLI
+const CCR_COMMAND_REGEX = /(?:^|[\\/])(?:ccr|claude)(?:\\.exe)?$/i;
 
 function normalizeEnvValue(value) {
   if (typeof value !== 'string') {

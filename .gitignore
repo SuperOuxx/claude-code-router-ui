@@ -135,3 +135,5 @@ dev-debug.log
 # Task files
 tasks.json
 tasks/ 
+
+del-nul.bat

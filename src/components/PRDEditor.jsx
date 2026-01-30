@@ -772,10 +772,10 @@ This document outlines the requirements for building an AI-powered task manageme
                   </div>
                   <div className="flex-1">
                     <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
-                      💡 Pro Tip: Ask Claude Code Directly!
+                      💡 Pro Tip: Ask CCR Directly!
                     </h4>
                     <p className="text-sm text-purple-800 dark:text-purple-200 mb-3">
-                      You can simply ask Claude Code in the chat to parse your PRD and generate tasks. 
+                      You can simply ask CCR in the chat to parse your PRD and generate tasks. 
                       The AI assistant will automatically save your PRD and create detailed tasks with implementation details.
                     </p>
                     
@@ -814,7 +814,7 @@ This document outlines the requirements for building an AI-powered task manageme
                   onClick={() => setShowGenerateModal(false)}
                   className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                 >
-                  Got it, I'll ask Claude Code directly
+                  Got it, I'll ask CCR directly
                 </button>
               </div>
             </div>

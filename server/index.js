@@ -46,7 +46,7 @@ import multer from 'multer';
 
 import { getProjects, getSessions, getSessionMessages, renameProject, deleteSession, deleteProject, addProjectManually, extractProjectDirectory, clearProjectDirectoryCache } from './projects.js';
 import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getActiveClaudeSDKSessions, resolveToolApproval } from './claude-sdk.js';
-import { queryClaudeCLI, abortClaudeCLISession, isClaudeCLISessionActive, getActiveClaudeCLISessions } from './claude-cli.js';
+import { queryClaudeCLI, queryClaudeOfficialCLI, abortClaudeCLISession, isClaudeCLISessionActive, getActiveClaudeCLISessions } from './claude-cli.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from './cursor-cli.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from './openai-codex.js';
 import { formatBashInvocation, formatPowerShellInvocation, getClaudeCliTokens, shouldUseClaudeCliChat } from './utils/claudeCli.js';
@@ -958,6 +958,13 @@ function handleChatConnection(ws) {
                     // Use Claude Agents SDK (default)
                     await queryClaudeSDK(data.command, data.options, writer);
                 }
+            } else if (data.type === 'claude-official-command') {
+                console.log('[DEBUG] User message (Claude official):', data.command || '[Continue/Resume]');
+                console.log('📁 Project:', data.options?.projectPath || 'Unknown');
+                console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
+
+                // Always use official claude CLI for claude-official-command
+                await queryClaudeOfficialCLI(data.command, data.options, writer);
             } else if (data.type === 'cursor-command') {
                 console.log('[DEBUG] Cursor message:', data.command || '[Continue/Resume]');
                 console.log('📁 Project:', data.options?.cwd || 'Unknown');
@@ -987,7 +994,11 @@ function handleChatConnection(ws) {
                     success = abortCursorSession(data.sessionId);
                 } else if (provider === 'codex') {
                     success = abortCodexSession(data.sessionId);
+                } else if (provider === 'claude-official') {
+                    // claude-official always uses CLI
+                    success = abortClaudeCLISession(data.sessionId);
                 } else {
+                    // claude provider
                     if (shouldUseClaudeCliChat()) {
                         success = abortClaudeCLISession(data.sessionId);
                     } else {
@@ -1033,7 +1044,11 @@ function handleChatConnection(ws) {
                     isActive = isCursorSessionActive(sessionId);
                 } else if (provider === 'codex') {
                     isActive = isCodexSessionActive(sessionId);
+                } else if (provider === 'claude-official') {
+                    // claude-official always uses CLI
+                    isActive = isClaudeCLISessionActive(sessionId);
                 } else {
+                    // claude provider
                     if (shouldUseClaudeCliChat()) {
                         isActive = isClaudeCLISessionActive(sessionId);
                     } else {
@@ -1937,7 +1952,7 @@ async function startServer() {
 
             console.log('');
             console.log(c.dim('═'.repeat(63)));
-            console.log(`  ${c.bright('Claude Code UI Server - Ready')}`);
+            console.log(`  ${c.bright('CCR UI Server - Ready')}`);
             console.log(c.dim('═'.repeat(63)));
             console.log('');
             console.log(`${c.info('[INFO]')} Server URL:  ${c.bright('http://0.0.0.0:' + PORT)}`);

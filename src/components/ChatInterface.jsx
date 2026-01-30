@@ -310,7 +310,7 @@ function formatToolInputForDisplay(input) {
 }
 
 function getClaudePermissionSuggestion(message, provider) {
-  if (provider !== 'claude') return null;
+  if (provider !== 'claude' && provider !== 'claude-official') return null;
   if (!message?.toolResult?.isError) return null;
 
   const toolName = message?.toolName;
@@ -598,7 +598,7 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                 </div>
               )}
               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                {message.type === 'error' ? t('messageTypes.error') : message.type === 'tool' ? t('messageTypes.tool') : ((localStorage.getItem('selected-provider') || 'claude') === 'cursor' ? t('messageTypes.cursor') : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? t('messageTypes.codex') : t('messageTypes.claude'))}
+                {message.type === 'error' ? t('messageTypes.error') : message.type === 'tool' ? t('messageTypes.tool') : ((localStorage.getItem('selected-provider') || 'claude') === 'cursor' ? t('messageTypes.cursor') : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? t('messageTypes.codex') : (localStorage.getItem('selected-provider') || 'claude') === 'claude-official' ? 'Claude (official)' : t('messageTypes.claude'))}
               </div>
             </div>
           )}
@@ -3589,7 +3589,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
           // Receive a tool approval request from the backend and surface it in the UI.
           // This does not approve anything automatically; it only queues a prompt,
           // introduced so the user can decide before the SDK continues.
-          if (provider !== 'claude' || !latestMessage.requestId) {
+          if ((provider !== 'claude' && provider !== 'claude-official') || !latestMessage.requestId) {
             break;
           }
 
@@ -4548,8 +4548,24 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
           permissionMode: permissionMode === 'plan' ? 'default' : permissionMode
         }
       });
+    } else if (provider === 'claude-official') {
+      // Send Claude official command (use official claude CLI)
+      sendMessage({
+        type: 'claude-official-command',
+        command: messageContent,
+        options: {
+          projectPath: selectedProject.path,
+          cwd: selectedProject.fullPath,
+          sessionId: currentSessionId,
+          resume: !!currentSessionId,
+          toolsSettings: toolsSettings,
+          permissionMode: permissionMode,
+          model: claudeModel,
+          images: uploadedImages // Pass images to backend
+        }
+      });
     } else {
-      // Send Claude command (existing code)
+      // Send CCR command (claude-code-router)
       sendMessage({
         type: 'claude-command',
         command: messageContent,
@@ -4585,7 +4601,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
   }, [input, isLoading, selectedProject, attachedImages, currentSessionId, selectedSession, provider, permissionMode, onSessionActive, cursorModel, claudeModel, codexModel, sendMessage, setInput, setAttachedImages, setUploadingImages, setImageErrors, setIsTextareaExpanded, textareaRef, setChatMessages, setIsLoading, setCanAbortSession, setClaudeStatus, setIsUserScrolledUp, scrollToBottom, thinkingMode]);
 
   const handleGrantToolPermission = useCallback((suggestion) => {
-    if (!suggestion || provider !== 'claude') {
+    if (!suggestion || (provider !== 'claude' && provider !== 'claude-official')) {
       return { success: false };
     }
     return grantClaudeToolPermission(suggestion.entry);
@@ -4810,8 +4826,8 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
     const cursorPos = e.target.selectionStart;
 
     // Auto-select Claude provider if no session exists and user starts typing
-    if (!currentSessionId && newValue.trim() && provider === 'claude') {
-      // Provider is already set to 'claude' by default, so no need to change it
+    if (!currentSessionId && newValue.trim() && (provider === 'claude' || provider === 'claude-official')) {
+      // Provider is already set by default, so no need to change it
       // The session will be created automatically when they submit
     }
 
@@ -4986,7 +5002,8 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                       className="w-full pl-4 pr-10 py-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
                     >
                       <option value="" disabled>Select an AI Assistant</option>
-                      <option value="claude">Claude Code (Anthropic)</option>
+                      <option value="claude">CCR (claude-code-router)</option>
+                      <option value="claude-official">Claude (official)</option>
                       <option value="cursor">Cursor (Editor)</option>
                       <option value="codex">Codex (OpenAI)</option>
                     </select>
@@ -4998,7 +5015,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Model
                       </label>
-                      {provider === 'claude' ? (
+                      {provider === 'claude' || provider === 'claude-official' ? (
                         <select
                           value={claudeModel}
                           onChange={(e) => {
@@ -5049,6 +5066,8 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                 {provider && (
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
                     {provider === 'claude'
+                      ? t('providerSelection.readyPrompt.claude', { model: claudeModel })
+                      : provider === 'claude-official'
                       ? t('providerSelection.readyPrompt.claude', { model: claudeModel })
                       : provider === 'cursor'
                       ? t('providerSelection.readyPrompt.cursor', { model: cursorModel })
@@ -5163,7 +5182,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                     <ClaudeLogo className="w-full h-full" />
                   )}
                 </div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">{(localStorage.getItem('selected-provider') || 'claude') === 'cursor' ? 'Cursor' : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? 'Codex' : 'Claude'}</div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{(localStorage.getItem('selected-provider') || 'claude') === 'cursor' ? 'Cursor' : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? 'Codex' : (localStorage.getItem('selected-provider') || 'claude') === 'claude-official' ? 'Claude (official)' : 'Claude'}</div>
                 {/* Abort button removed - functionality not yet implemented at backend */}
               </div>
               <div className="w-full text-sm text-gray-500 dark:text-gray-400 pl-3 sm:pl-0">
@@ -5329,7 +5348,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
             
               {/* Thinking Mode Selector */}
               {
-                provider === 'claude' && (
+                (provider === 'claude' || provider === 'claude-official') && (
 
                   <ThinkingModeSelector
                     selectedMode={thinkingMode}

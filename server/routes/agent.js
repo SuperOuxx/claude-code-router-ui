@@ -950,6 +950,20 @@ router.post('/', validateExternalApiKey, async (req, res) => {
         permissionMode: 'bypassPermissions' // Bypass all permissions for API calls
       }, writer);
 
+    } else if (provider === 'claude-official') {
+      console.log('🤖 Starting Claude Official CLI session');
+
+      // Import the queryClaudeOfficialCLI function
+      const { queryClaudeOfficialCLI } = await import('../claude-cli.js');
+
+      await queryClaudeOfficialCLI(message.trim(), {
+        projectPath: finalProjectPath,
+        cwd: finalProjectPath,
+        sessionId: null, // New session
+        model: model,
+        permissionMode: 'bypassPermissions' // Bypass all permissions for API calls
+      }, writer);
+
     } else if (provider === 'cursor') {
       console.log('🖱️ Starting Cursor CLI session');
 
@@ -1110,7 +1124,7 @@ router.post('/', validateExternalApiKey, async (req, res) => {
           } else {
             prBody += `Agent task: ${message}`;
           }
-          prBody += '\n\n---\n*This pull request was automatically created by Claude Code UI Agent.*';
+          prBody += '\n\n---\n*This pull request was automatically created by CCR UI Agent.*';
 
           console.log(`📝 PR Title: ${prTitle}`);
 

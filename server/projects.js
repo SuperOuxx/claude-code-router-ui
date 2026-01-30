@@ -1105,7 +1105,7 @@ async function addProjectManually(projectPath, displayName = null) {
   }
 
   // Allow adding projects even if the directory exists - this enables tracking
-  // existing Claude Code or Cursor projects in the UI
+  // existing CCR or Cursor projects in the UI
 
   // Add to config as manually added project
   config[projectName] = {
