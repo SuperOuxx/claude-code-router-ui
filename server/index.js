@@ -49,6 +49,7 @@ import { queryClaudeSDK, abortClaudeSDKSession, isClaudeSDKSessionActive, getAct
 import { queryClaudeCLI, queryClaudeOfficialCLI, abortClaudeCLISession, isClaudeCLISessionActive, getActiveClaudeCLISessions } from './claude-cli.js';
 import { spawnCursor, abortCursorSession, isCursorSessionActive, getActiveCursorSessions } from './cursor-cli.js';
 import { queryCodex, abortCodexSession, isCodexSessionActive, getActiveCodexSessions } from './openai-codex.js';
+import { spawnGemini, abortGeminiSession, isGeminiSessionActive, getActiveGeminiSessions } from './gemini-cli.js';
 import { formatBashInvocation, formatPowerShellInvocation, getClaudeCliTokens, shouldUseClaudeCliChat } from './utils/claudeCli.js';
 import { SafeWriteError, writeAssetFile, writeMarkdownFile } from './utils/safeFileWrite.js';
 import gitRoutes from './routes/git.js';
@@ -977,6 +978,12 @@ function handleChatConnection(ws) {
                 console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
                 console.log('🤖 Model:', data.options?.model || 'default');
                 await queryCodex(data.command, data.options, writer);
+            } else if (data.type === 'gemini-command') {
+                console.log('[DEBUG] Gemini message:', data.command || '[Continue/Resume]');
+                console.log('📁 Project:', data.options?.cwd || 'Unknown');
+                console.log('🔄 Session:', data.options?.sessionId ? 'Resume' : 'New');
+                console.log('🤖 Model:', data.options?.model || 'default');
+                await spawnGemini(data.command, data.options, writer);
             } else if (data.type === 'cursor-resume') {
                 // Backward compatibility: treat as cursor-command with resume and no prompt
                 console.log('[DEBUG] Cursor resume session (compat):', data.sessionId);
@@ -994,6 +1001,8 @@ function handleChatConnection(ws) {
                     success = abortCursorSession(data.sessionId);
                 } else if (provider === 'codex') {
                     success = abortCodexSession(data.sessionId);
+                } else if (provider === 'gemini') {
+                    success = abortGeminiSession(data.sessionId);
                 } else if (provider === 'claude-official') {
                     // claude-official always uses CLI
                     success = abortClaudeCLISession(data.sessionId);
@@ -1044,6 +1053,8 @@ function handleChatConnection(ws) {
                     isActive = isCursorSessionActive(sessionId);
                 } else if (provider === 'codex') {
                     isActive = isCodexSessionActive(sessionId);
+                } else if (provider === 'gemini') {
+                    isActive = isGeminiSessionActive(sessionId);
                 } else if (provider === 'claude-official') {
                     // claude-official always uses CLI
                     isActive = isClaudeCLISessionActive(sessionId);
@@ -1068,7 +1079,8 @@ function handleChatConnection(ws) {
                 const activeSessions = {
                     claude: shouldUseClaudeCliChat() ? getActiveClaudeCLISessions() : getActiveClaudeSDKSessions(),
                     cursor: getActiveCursorSessions(),
-                    codex: getActiveCodexSessions()
+                    codex: getActiveCodexSessions(),
+                    gemini: getActiveGeminiSessions()
                 };
                 writer.send({
                     type: 'active-sessions',
@@ -1208,6 +1220,21 @@ function handleShellConnection(ws) {
                                 shellCommand = `cd "${projectPath}" && cursor-agent --resume="${sessionId}"`;
                             } else {
                                 shellCommand = `cd "${projectPath}" && cursor-agent`;
+                            }
+                        }
+                    } else if (provider === 'gemini') {
+                        // Use gemini command
+                        if (os.platform() === 'win32') {
+                            if (hasSession && sessionId) {
+                                shellCommand = `Set-Location -Path "${projectPath}"; gemini --resume="${sessionId}"`;
+                            } else {
+                                shellCommand = `Set-Location -Path "${projectPath}"; gemini`;
+                            }
+                        } else {
+                            if (hasSession && sessionId) {
+                                shellCommand = `cd "${projectPath}" && gemini --resume="${sessionId}"`;
+                            } else {
+                                shellCommand = `cd "${projectPath}" && gemini`;
                             }
                         }
                     } else {

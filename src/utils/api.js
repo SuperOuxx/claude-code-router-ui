@@ -79,6 +79,10 @@ export const api = {
     authenticatedFetch(`/api/codex/sessions/${sessionId}`, {
       method: 'DELETE',
     }),
+  deleteGeminiSession: (sessionId) =>
+    authenticatedFetch(`/api/gemini/sessions/${sessionId}`, {
+      method: 'DELETE',
+    }),
   deleteProject: (projectName, force = false) =>
     authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}${force ? '?force=true' : ''}`, {
       method: 'DELETE',

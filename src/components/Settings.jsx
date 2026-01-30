@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import ClaudeLogo from './ClaudeLogo';
 import CursorLogo from './CursorLogo';
 import CodexLogo from './CodexLogo';
+import GeminiLogo from './GeminiLogo';
 import CredentialsSettings from './CredentialsSettings';
 import GitSettings from './GitSettings';
 import TasksSettings from './TasksSettings';
@@ -58,7 +59,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const [mcpToolsLoading, setMcpToolsLoading] = useState({});
   const [activeTab, setActiveTab] = useState(initialTab);
   const [jsonValidationError, setJsonValidationError] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState('claude'); // 'claude', 'cursor', or 'codex'
+  const [selectedAgent, setSelectedAgent] = useState('claude'); // 'claude', 'cursor', 'codex', or 'gemini'
   const [selectedCategory, setSelectedCategory] = useState('account'); // 'account', 'permissions', or 'mcp'
 
   // Code Editor settings
@@ -119,6 +120,12 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
     error: null
   });
   const [codexAuthStatus, setCodexAuthStatus] = useState({
+    authenticated: false,
+    email: null,
+    loading: true,
+    error: null
+  });
+  const [geminiAuthStatus, setGeminiAuthStatus] = useState({
     authenticated: false,
     email: null,
     loading: true,
@@ -1281,6 +1288,13 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       onClick={() => setSelectedAgent('codex')}
                       isMobile={true}
                     />
+                    <AgentListItem
+                      agentId="gemini"
+                      authStatus={geminiAuthStatus}
+                      isSelected={selectedAgent === 'gemini'}
+                      onClick={() => setSelectedAgent('gemini')}
+                      isMobile={true}
+                    />
                   </div>
                 </div>
 
@@ -1304,6 +1318,12 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       authStatus={codexAuthStatus}
                       isSelected={selectedAgent === 'codex'}
                       onClick={() => setSelectedAgent('codex')}
+                    />
+                    <AgentListItem
+                      agentId="gemini"
+                      authStatus={geminiAuthStatus}
+                      isSelected={selectedAgent === 'gemini'}
+                      onClick={() => setSelectedAgent('gemini')}
                     />
                   </div>
                 </div>

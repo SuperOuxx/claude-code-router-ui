@@ -28,6 +28,7 @@ import TodoList from './TodoList';
 import ClaudeLogo from './ClaudeLogo.jsx';
 import CursorLogo from './CursorLogo.jsx';
 import CodexLogo from './CodexLogo.jsx';
+import GeminiLogo from './GeminiLogo.jsx';
 import NextTaskBanner from './NextTaskBanner.jsx';
 import { useTasksSettings } from '../contexts/TasksSettingsContext';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +40,7 @@ import { api, authenticatedFetch } from '../utils/api';
 import ThinkingModeSelector, { thinkingModes } from './ThinkingModeSelector.jsx';
 import Fuse from 'fuse.js';
 import CommandMenu from './CommandMenu';
-import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS } from '../../shared/modelConstants';
+import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS, GEMINI_MODELS } from '../../shared/modelConstants';
 
 import { safeJsonParse } from '../lib/utils.js';
 
@@ -592,13 +593,15 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                     <CursorLogo className="w-full h-full" />
                   ) : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? (
                     <CodexLogo className="w-full h-full" />
+                  ) : (localStorage.getItem('selected-provider') || 'claude') === 'gemini' ? (
+                    <GeminiLogo className="w-full h-full" />
                   ) : (
                     <ClaudeLogo className="w-full h-full" />
                   )}
                 </div>
               )}
               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                {message.type === 'error' ? t('messageTypes.error') : message.type === 'tool' ? t('messageTypes.tool') : ((localStorage.getItem('selected-provider') || 'claude') === 'cursor' ? t('messageTypes.cursor') : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? t('messageTypes.codex') : (localStorage.getItem('selected-provider') || 'claude') === 'claude-official' ? 'Claude (official)' : t('messageTypes.claude'))}
+                {message.type === 'error' ? t('messageTypes.error') : message.type === 'tool' ? t('messageTypes.tool') : ((localStorage.getItem('selected-provider') || 'claude') === 'cursor' ? t('messageTypes.cursor') : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? t('messageTypes.codex') : (localStorage.getItem('selected-provider') || 'claude') === 'gemini' ? 'Gemini' : (localStorage.getItem('selected-provider') || 'claude') === 'claude-official' ? 'Claude (official)' : t('messageTypes.claude'))}
               </div>
             </div>
           )}
@@ -1944,6 +1947,9 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
   });
   const [codexModel, setCodexModel] = useState(() => {
     return localStorage.getItem('codex-model') || CODEX_MODELS.DEFAULT;
+  });
+  const [geminiModel, setGeminiModel] = useState(() => {
+    return localStorage.getItem('gemini-model') || GEMINI_MODELS.DEFAULT;
   });
   // Track provider transitions so we only clear approvals when provider truly changes.
   // This does not sync with the backend; it just prevents UI prompts from disappearing.
@@ -4548,6 +4554,20 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
           permissionMode: permissionMode === 'plan' ? 'default' : permissionMode
         }
       });
+    } else if (provider === 'gemini') {
+      // Send Gemini command
+      sendMessage({
+        type: 'gemini-command',
+        command: messageContent,
+        sessionId: effectiveSessionId,
+        options: {
+          cwd: selectedProject.path,
+          sessionId: effectiveSessionId,
+          resume: !!effectiveSessionId,
+          model: geminiModel,
+          toolsSettings: toolsSettings
+        }
+      });
     } else if (provider === 'claude-official') {
       // Send Claude official command (use official claude CLI)
       sendMessage({
@@ -5006,6 +5026,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                       <option value="claude-official">Claude (official)</option>
                       <option value="cursor">Cursor (Editor)</option>
                       <option value="codex">Codex (OpenAI)</option>
+                      <option value="gemini">Gemini (Google)</option>
                     </select>
                   </div>
 
@@ -5043,6 +5064,20 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                             <option key={value} value={value}>{label}</option>
                           ))}
                         </select>
+                      ) : provider === 'gemini' ? (
+                        <select
+                          value={geminiModel}
+                          onChange={(e) => {
+                            const newModel = e.target.value;
+                            setGeminiModel(newModel);
+                            localStorage.setItem('gemini-model', newModel);
+                          }}
+                          className="w-full pl-4 pr-10 py-2.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
+                        >
+                          {GEMINI_MODELS.OPTIONS.map(({ value, label }) => (
+                            <option key={value} value={value}>{label}</option>
+                          ))}
+                        </select>
                       ) : (
                         <select
                           value={cursorModel}
@@ -5073,6 +5108,8 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                       ? t('providerSelection.readyPrompt.cursor', { model: cursorModel })
                       : provider === 'codex'
                       ? t('providerSelection.readyPrompt.codex', { model: codexModel })
+                      : provider === 'gemini'
+                      ? t('providerSelection.readyPrompt.gemini', { model: geminiModel })
                       : t('providerSelection.readyPrompt.default')
                     }
                   </p>
@@ -5178,11 +5215,13 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                     <CursorLogo className="w-full h-full" />
                   ) : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? (
                     <CodexLogo className="w-full h-full" />
+                  ) : (localStorage.getItem('selected-provider') || 'claude') === 'gemini' ? (
+                    <GeminiLogo className="w-full h-full" />
                   ) : (
                     <ClaudeLogo className="w-full h-full" />
                   )}
                 </div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">{(localStorage.getItem('selected-provider') || 'claude') === 'cursor' ? 'Cursor' : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? 'Codex' : (localStorage.getItem('selected-provider') || 'claude') === 'claude-official' ? 'Claude (official)' : 'Claude'}</div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">{(localStorage.getItem('selected-provider') || 'claude') === 'cursor' ? 'Cursor' : (localStorage.getItem('selected-provider') || 'claude') === 'codex' ? 'Codex' : (localStorage.getItem('selected-provider') || 'claude') === 'gemini' ? 'Gemini' : (localStorage.getItem('selected-provider') || 'claude') === 'claude-official' ? 'Claude (official)' : 'Claude'}</div>
                 {/* Abort button removed - functionality not yet implemented at backend */}
               </div>
               <div className="w-full text-sm text-gray-500 dark:text-gray-400 pl-3 sm:pl-0">
