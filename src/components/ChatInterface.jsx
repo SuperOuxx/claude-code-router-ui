@@ -1951,6 +1951,11 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
   const [geminiModel, setGeminiModel] = useState(() => {
     return localStorage.getItem('gemini-model') || GEMINI_MODELS.DEFAULT;
   });
+
+  // Agents state
+  const [agents, setAgents] = useState([]);
+  const [selectedAgent, setSelectedAgent] = useState(null);
+
   // Track provider transitions so we only clear approvals when provider truly changes.
   // This does not sync with the backend; it just prevents UI prompts from disappearing.
   const lastProviderRef = useRef(provider);
@@ -2072,6 +2077,38 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
 
     fetchCommands();
   }, [selectedProject]);
+
+  // Fetch agents on mount
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const response = await authenticatedFetch('/api/agents');
+        if (response.ok) {
+          const data = await response.json();
+          setAgents(data.agents || []);
+        }
+      } catch (error) {
+        console.error('Error fetching agents:', error);
+      }
+    };
+
+    fetchAgents();
+  }, []);
+
+  // Handle agent selection - insert @"${selectedAgent} (agent)" at the beginning of input
+  useEffect(() => {
+    if (selectedAgent) {
+      const agentMention = `@"${selectedAgent} (agent)" `;
+      setInput(prev => {
+        // Remove any existing agent mention at the beginning
+        const cleaned = prev.replace(/^@"[^"]+"/, '');
+        // Prepend the new agent mention
+        return agentMention + cleaned;
+      });
+      // Clear the selection after inserting
+      setSelectedAgent(null);
+    }
+  }, [selectedAgent]);
 
   // Create Fuse instance for fuzzy search
   const fuse = useMemo(() => {
@@ -5582,6 +5619,31 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
             isOpen={showCommandMenu}
             frequentCommands={commandQuery ? [] : frequentCommands}
           />
+
+          {/* Agents Selector */}
+          {agents.length > 0 && (
+            <div className="mb-2 flex items-center gap-2">
+              <label htmlFor="agent-select" className="text-xs text-gray-500 dark:text-gray-400">Agents:</label>
+              <select
+                id="agent-select"
+                value=""
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedAgent(e.target.value);
+                    e.target.value = ''; // Reset after selection
+                  }
+                }}
+                className="px-3 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500 cursor-pointer"
+              >
+                <option value="">Select an agent...</option>
+                {agents.map((agent) => (
+                  <option key={agent.name} value={agent.name}>
+                    {agent.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div {...getRootProps()} className={`relative bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-600 focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-500 focus-within:border-blue-500 transition-all duration-200 overflow-hidden ${isTextareaExpanded ? 'chat-input-expanded' : ''}`}>
             <input {...getInputProps()} />
