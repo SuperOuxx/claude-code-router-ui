@@ -58,6 +58,7 @@ function Sidebar({
   loadingProgress,
   onRefresh,
   onShowSettings,
+  onFileOpen,
   updateAvailable,
   latestVersion,
   currentVersion,
@@ -1168,7 +1169,10 @@ function Sidebar({
                     <div className="ml-3 border-l border-border pl-3">
                       {/* FileTree component */}
                       <div className="h-full overflow-hidden">
-                        <FileTree selectedProject={project} />
+                        <FileTree
+                          selectedProject={project}
+                          onFileOpen={(filePath) => onFileOpen?.(filePath, null, project.name)}
+                        />
                       </div>
                     </div>
                   )}

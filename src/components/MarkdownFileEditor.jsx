@@ -442,8 +442,8 @@ function MarkdownFileEditor({ file, onClose, isActive = true, onDirtyChange = nu
   // ==========================================================================
 
   return (
-    <div className="h-full w-full flex flex-col" data-testid="md-editor-modal">
-      <div className="h-full w-full flex flex-col overflow-hidden">
+    <div className="w-full h-full flex flex-col" data-testid="md-editor-modal">
+      <div className="bg-background w-full h-full flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border gap-3">

@@ -85,6 +85,7 @@ function AppContent() {
 
   // Ref to track loading progress timeout for cleanup
   const loadingProgressTimeoutRef = useRef(null);
+  const mainContentRef = useRef(null);
 
   // Detect if running as PWA
   const [isPWA, setIsPWA] = useState(false);
@@ -579,6 +580,11 @@ function AppContent() {
     }
   }, []);
 
+  const handleSidebarFileOpen = useCallback((filePath, diffInfo = null, projectNameOverride = null) => {
+    mainContentRef.current?.openFile?.(filePath, diffInfo, projectNameOverride);
+    if (isMobile) setSidebarOpen(false);
+  }, [isMobile]);
+
   // Version Upgrade Modal Component
   const VersionUpgradeModal = () => {
     const { t } = useTranslation('common');
@@ -796,6 +802,7 @@ function AppContent() {
                 onNewSession={handleNewSession}
                 onSessionDelete={handleSessionDelete}
                 onProjectDelete={handleProjectDelete}
+                onFileOpen={handleSidebarFileOpen}
                 isLoading={isLoadingProjects}
                 loadingProgress={loadingProgress}
                 onRefresh={handleSidebarRefresh}
@@ -891,6 +898,7 @@ function AppContent() {
               onNewSession={handleNewSession}
               onSessionDelete={handleSessionDelete}
               onProjectDelete={handleProjectDelete}
+              onFileOpen={handleSidebarFileOpen}
               isLoading={isLoadingProjects}
               loadingProgress={loadingProgress}
               onRefresh={handleSidebarRefresh}
@@ -911,6 +919,7 @@ function AppContent() {
       {/* Main Content Area - Flexible */}
       <div className={`flex-1 flex flex-col min-w-0 ${isMobile && !isInputFocused ? 'pb-mobile-nav' : ''}`}>
         <MainContent
+          ref={mainContentRef}
           selectedProject={selectedProject}
           selectedSession={selectedSession}
           activeTab={activeTab}

@@ -11,11 +11,12 @@
  * No session protection logic is implemented here - it's purely a props bridge.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, Plus } from 'lucide-react';
 import ChatInterface from './ChatInterface';
 import CodeEditor from './CodeEditor';
+import MarkdownFileEditor from './MarkdownFileEditor';
 import StandaloneShell from './StandaloneShell';
 import GitPanel from './GitPanel';
 import ErrorBoundary from './ErrorBoundary';
@@ -34,7 +35,7 @@ import { cn } from '../lib/utils';
 const CHAT_PANEL_DEFAULT_WIDTH = 500;
 const CHAT_PANEL_MIN_WIDTH = 250;
 
-function MainContent({
+const MainContent = React.memo(React.forwardRef(function MainContent({
   selectedProject,
   selectedSession,
   activeTab,
@@ -65,7 +66,7 @@ function MainContent({
   externalMessageUpdate,  // Trigger for external CLI updates to current session
   projects,               // All projects data
   onNewSession            // Create new session handler
-}) {
+}, ref) {
   const { t } = useTranslation();
   const [editingFile, setEditingFile] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -157,12 +158,19 @@ function MainContent({
     return [...claudeSessions, ...cursorSessions, ...codexSessions].sort((a, b) => normalizeDate(b) - normalizeDate(a));
   };
 
-  const handleFileOpen = async (filePath, diffInfo = null) => {
+  // Helper function to check if a file is a markdown file
+  const isMarkdownFile = useCallback((fileName) => {
+    if (!fileName) return false;
+    const name = fileName.toLowerCase();
+    return name.endsWith('.md') || name.endsWith('.markdown');
+  }, []);
+
+  const handleFileOpen = async (filePath, diffInfo = null, projectNameOverride = null) => {
     // Create a file object that CodeEditor expects
     const nextFile = {
-      name: filePath.split('/').pop(),
+      name: filePath.split(/[\\/]/).pop(),
       path: filePath,
-      projectName: selectedProject?.name,
+      projectName: projectNameOverride || selectedProject?.name,
       diffInfo: diffInfo // Pass along diff information if available
     };
 
@@ -182,6 +190,17 @@ function MainContent({
     setEditingFile(null);
     setEditorExpanded(false);
   };
+
+  const showChatPanel = activeTab === 'chat' && (!isMobile || !editingFile);
+  const editorProjectPath = useMemo(() => {
+    const editorProject = projects?.find(p => p.name === editingFile?.projectName) || selectedProject;
+    return editorProject?.path;
+  }, [projects, selectedProject, editingFile?.projectName]);
+
+  useImperativeHandle(ref, () => ({
+    openFile: handleFileOpen,
+    closeFile: handleCloseEditor
+  }));
 
   const handleToggleEditorExpand = () => {
     const newExpanded = !editorExpanded;
@@ -609,8 +628,11 @@ function MainContent({
       {/* Three-Column Layout: Editor | Chat */}
       <div className="flex-1 flex min-h-0 overflow-hidden relative">
         {/* Middle Column: Editor */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ maxWidth: `calc(100% - ${chatWidth}px)` }}>
-          {editingFile && !isMobile ? (
+        <div
+          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+          style={showChatPanel ? { maxWidth: `calc(100% - ${chatWidth}px)` } : undefined}
+        >
+          {editingFile ? (
               <>
                 {/* Resize handle - only show when editor is not expanded */}
                 {!editorExpanded && (
@@ -628,15 +650,24 @@ function MainContent({
                   className={`h-full overflow-hidden ${editorExpanded ? 'flex-1' : ''}`}
                   style={editorExpanded ? {} : { width: `${editorWidth}px` }}
                 >
-                  <CodeEditor
-                    ref={codeEditorRef}
-                    file={editingFile}
-                    onClose={handleCloseEditor}
-                    projectPath={selectedProject?.path}
-                    isSidebar={true}
-                    isExpanded={editorExpanded}
-                    onToggleExpand={handleToggleEditorExpand}
-                  />
+                  {/* Use MarkdownFileEditor for markdown files, CodeEditor for other files */}
+                  {isMarkdownFile(editingFile.name) ? (
+                    <MarkdownFileEditor
+                      file={editingFile}
+                      onClose={handleCloseEditor}
+                      isActive={true}
+                    />
+                  ) : (
+                    <CodeEditor
+                      ref={codeEditorRef}
+                      file={editingFile}
+                      onClose={handleCloseEditor}
+                      projectPath={editorProjectPath}
+                      isSidebar={true}
+                      isExpanded={editorExpanded}
+                      onToggleExpand={handleToggleEditorExpand}
+                    />
+                  )}
                 </div>
               </>
             ) : activeTab === 'shell' ? (
@@ -697,7 +728,7 @@ function MainContent({
         {/* Right Column: Chat Interface - Fixed right edge, resizable width */}
         <div
           ref={chatResizeRef}
-          className={`min-w-[250px] border-l border-gray-200 dark:border-gray-700 ${activeTab === 'chat' ? 'flex' : 'hidden'}`}
+          className={`min-w-[250px] border-l border-gray-200 dark:border-gray-700 ${showChatPanel ? 'flex' : 'hidden'}`}
           style={{
             position: 'absolute',
             right: 0,
@@ -743,17 +774,6 @@ function MainContent({
           </div>
         </div>
       </div>
-
-      {/* Code Editor Modal for Mobile */}
-      {editingFile && isMobile && (
-        <CodeEditor
-          ref={codeEditorRef}
-          file={editingFile}
-          onClose={handleCloseEditor}
-          projectPath={selectedProject?.path}
-          isSidebar={false}
-        />
-      )}
 
       {/* Task Detail Modal */}
       {shouldShowTasksTab && showTaskDetail && selectedTask && (
@@ -813,6 +833,6 @@ function MainContent({
       )}
     </div>
   );
-}
+}));
 
-export default React.memo(MainContent);
+export default MainContent;

@@ -10,7 +10,7 @@ import MarkdownFileEditor from './MarkdownFileEditor';
 import ImageViewer from './ImageViewer';
 import { api } from '../utils/api';
 
-function FileTree({ selectedProject }) {
+function FileTree({ selectedProject, onFileOpen = null }) {
   const { t } = useTranslation();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -161,6 +161,11 @@ function FileTree({ selectedProject }) {
   };
 
   const openProjectFile = (file, { newTab = false } = {}) => {
+    if (onFileOpen) {
+      onFileOpen(file.path);
+      return;
+    }
+
     const existing = editorTabs.find(tab =>
       tab.file.projectName === file.projectName && tab.file.path === file.path
     );
@@ -576,7 +581,7 @@ function FileTree({ selectedProject }) {
       )}
 
       {/* Editor Tabs Modal */}
-      {editorTabs.length > 0 && (
+      {!onFileOpen && editorTabs.length > 0 && (
         <div className="fixed inset-0 z-40 md:bg-black/50 md:flex md:items-center md:justify-center md:p-4">
           <div className="bg-background shadow-2xl flex flex-col w-full h-full md:rounded-lg md:shadow-2xl md:w-full md:max-w-6xl md:h-[80vh] md:max-h-[80vh]">
             <div className="flex items-center justify-between p-2 border-b border-border bg-muted gap-2">
