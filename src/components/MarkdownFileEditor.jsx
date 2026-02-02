@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Save, Type, X, FileText } from 'lucide-react';
 import { api } from '../utils/api';
 import { loadVditor } from '../lib/vditorLoader';
+import { useTheme } from '../contexts/ThemeContext';
 
 // ============================================================================
 // Constants
@@ -75,13 +76,7 @@ function getEditorStatusText(conflict, uploading, saving, dirty) {
   return 'Saved';
 }
 
-/**
- * 获取主题模式
- */
-function getThemeMode() {
-  const savedTheme = localStorage.getItem('codeEditorTheme');
-  return savedTheme === 'dark' || !savedTheme ? 'dark' : 'classic';
-}
+// getThemeMode function removed - now using useTheme() hook
 
 // ============================================================================
 // Components
@@ -142,6 +137,7 @@ function MarkdownFileEditor({ file, onClose, isActive = true, onDirtyChange = nu
   // State
   // ==========================================================================
 
+  const { isDarkMode } = useTheme(); // Use app theme instead of separate editor theme
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
@@ -166,7 +162,6 @@ function MarkdownFileEditor({ file, onClose, isActive = true, onDirtyChange = nu
   // Memoized Values
   // ==========================================================================
 
-  const isDarkMode = useMemo(() => getThemeMode() === 'dark', []);
   const statusText = useMemo(
     () => getEditorStatusText(conflict, uploading, saving, dirty),
     [conflict, uploading, saving, dirty]
@@ -278,6 +273,22 @@ function MarkdownFileEditor({ file, onClose, isActive = true, onDirtyChange = nu
   // Vditor Integration
   // ==========================================================================
 
+  // Destroy and recreate Vditor when file changes
+  useEffect(() => {
+    if (editorMode !== EDITOR_MODE.VDITOR) return;
+
+    // Destroy existing instance when file path changes
+    if (vditorInstance) {
+      try {
+        vditorInstance.destroy();
+      } catch (e) {
+        console.error('Failed to destroy Vditor:', e);
+      }
+      setVditorInstance(null);
+      setVditorReady(false);
+    }
+  }, [file.path, editorMode]); // Destroy when file path or editor mode changes
+
   useEffect(() => {
     if (editorMode !== EDITOR_MODE.VDITOR) return;
     if (!vditorRef.current) return;
@@ -336,7 +347,18 @@ function MarkdownFileEditor({ file, onClose, isActive = true, onDirtyChange = nu
     };
 
     initVditor();
-  }, [editorMode, content, file.projectName, isDarkMode, vditorInstance]);
+  }, [editorMode, content, file.projectName, file.path, vditorInstance, isDarkMode]);
+
+  // Update Vditor theme when isDarkMode changes
+  useEffect(() => {
+    if (editorMode !== EDITOR_MODE.VDITOR || !vditorInstance) return;
+
+    try {
+      vditorInstance.setTheme(isDarkMode ? 'dark' : 'classic');
+    } catch (e) {
+      console.error('Failed to update Vditor theme:', e);
+    }
+  }, [isDarkMode, editorMode, vditorInstance]);
 
   // Update Vditor content when file is reloaded
   useEffect(() => {
@@ -443,6 +465,240 @@ function MarkdownFileEditor({ file, onClose, isActive = true, onDirtyChange = nu
 
   return (
     <div className="w-full h-full flex flex-col" data-testid="md-editor-modal">
+      <style>
+        {`
+          /* Vditor dark mode theme fixes */
+          .vditor-container.vditor--dark {
+            --toolbar-background-color: #1f2937;
+            --panel-background-color: #1f2937;
+            --textarea-background-color: #1f2937;
+            --border-color: #374151;
+            --text-color: #e5e7eb;
+            --heading-color: #f3f4f6;
+            --quote-color: #d1d5db;
+            --code-background-color: #111827;
+            --code-color: #e5e7eb;
+            --preview-background-color: #1f2937;
+          }
+
+          /* Toolbar styling */
+          .vditor-container.vditor--dark .vditor-toolbar,
+          .vditor-container.vditor--dark .vditor-toolbar--pin {
+            background-color: var(--toolbar-background-color);
+            border-bottom-color: var(--border-color);
+          }
+
+          .vditor-container.vditor--dark .vditor-toolbar button {
+            color: #d1d5db;
+          }
+
+          .vditor-container.vditor--dark .vditor-toolbar button:hover {
+            background-color: #374151;
+            color: #f3f4f6;
+          }
+
+          /* Content area - base text color */
+          .vditor-container.vditor--dark .vditor-content,
+          .vditor-container.vditor--dark .vditor-ir,
+          .vditor-container.vditor--dark .vditor-wysiwyg,
+          .vditor-container.vditor--dark .vditor-sv {
+            background-color: var(--textarea-background-color);
+            color: var(--text-color) !important;
+          }
+
+          /* All text elements in editor */
+          .vditor-container.vditor--dark .vditor-ir p,
+          .vditor-container.vditor--dark .vditor-wysiwyg p,
+          .vditor-container.vditor--dark .vditor-sv p,
+          .vditor-container.vditor--dark .vditor-ir span,
+          .vditor-container.vditor--dark .vditor-wysiwyg span,
+          .vditor-container.vditor--dark .vditor-sv span,
+          .vditor-container.vditor--dark .vditor-ir div,
+          .vditor-container.vditor--dark .vditor-wysiwyg div,
+          .vditor-container.vditor--dark .vditor-sv div {
+            color: var(--text-color) !important;
+          }
+
+          /* Headings */
+          .vditor-container.vditor--dark .vditor-ir h1,
+          .vditor-container.vditor--dark .vditor-ir h2,
+          .vditor-container.vditor--dark .vditor-ir h3,
+          .vditor-container.vditor--dark .vditor-ir h4,
+          .vditor-container.vditor--dark .vditor-ir h5,
+          .vditor-container.vditor--dark .vditor-ir h6,
+          .vditor-container.vditor--dark .vditor-wysiwyg h1,
+          .vditor-container.vditor--dark .vditor-wysiwyg h2,
+          .vditor-container.vditor--dark .vditor-wysiwyg h3,
+          .vditor-container.vditor--dark .vditor-wysiwyg h4,
+          .vditor-container.vditor--dark .vditor-wysiwyg h5,
+          .vditor-container.vditor--dark .vditor-wysiwyg h6,
+          .vditor-container.vditor--dark .vditor-sv h1,
+          .vditor-container.vditor--dark .vditor-sv h2,
+          .vditor-container.vditor--dark .vditor-sv h3,
+          .vditor-container.vditor--dark .vditor-sv h4,
+          .vditor-container.vditor--dark .vditor-sv h5,
+          .vditor-container.vditor--dark .vditor-sv h6 {
+            color: var(--heading-color) !important;
+          }
+
+          /* Links */
+          .vditor-container.vditor--dark .vditor-ir a,
+          .vditor-container.vditor--dark .vditor-wysiwyg a,
+          .vditor-container.vditor--dark .vditor-sv a {
+            color: #60a5fa !important;
+          }
+
+          .vditor-container.vditor--dark .vditor-ir a:hover,
+          .vditor-container.vditor--dark .vditor-wysiwyg a:hover,
+          .vditor-container.vditor--dark .vditor-sv a:hover {
+            color: #93c5fd !important;
+          }
+
+          /* Blockquotes */
+          .vditor-container.vditor--dark .vditor-ir blockquote,
+          .vditor-container.vditor--dark .vditor-wysiwyg blockquote,
+          .vditor-container.vditor--dark .vditor-sv blockquote {
+            color: var(--quote-color) !important;
+            border-left-color: var(--border-color) !important;
+            background-color: rgba(55, 65, 81, 0.3);
+          }
+
+          /* Lists */
+          .vditor-container.vditor--dark .vditor-ir ul,
+          .vditor-container.vditor--dark .vditor-wysiwyg ul,
+          .vditor-container.vditor--dark .vditor-sv ul,
+          .vditor-container.vditor--dark .vditor-ir ol,
+          .vditor-container.vditor--dark .vditor-wysiwyg ol,
+          .vditor-container.vditor--dark .vditor-sv ol,
+          .vditor-container.vditor--dark .vditor-ir li,
+          .vditor-container.vditor--dark .vditor-wysiwyg li,
+          .vditor-container.vditor--dark .vditor-sv li {
+            color: var(--text-color) !important;
+          }
+
+          /* Code blocks */
+          .vditor-container.vditor--dark .vditor-ir pre,
+          .vditor-container.vditor--dark .vditor-wysiwyg pre,
+          .vditor-container.vditor--dark .vditor-sv pre,
+          .vditor-container.vditor--dark .vditor-ir code,
+          .vditor-container.vditor--dark .vditor-wysiwyg code,
+          .vditor-container.vditor--dark .vditor-sv code {
+            background-color: var(--code-background-color) !important;
+            color: var(--code-color) !important;
+          }
+
+          .vditor-container.vditor--dark .vditor-ir pre.vditor-ir__marker--pre,
+          .vditor-container.vditor--dark .vditor-ir code.vditor-ir__marker--pre {
+            background-color: var(--code-background-color);
+            color: var(--code-color);
+          }
+
+          /* Inline code */
+          .vditor-container.vditor--dark .vditor-ir p code,
+          .vditor-container.vditor--dark .vditor-wysiwyg p code,
+          .vditor-container.vditor--dark .vditor-sv p code {
+            background-color: rgba(17, 24, 39, 0.5) !important;
+            color: #e5e7eb !important;
+            border: 1px solid #374151;
+          }
+
+          /* Tables */
+          .vditor-container.vditor--dark .vditor-ir table,
+          .vditor-container.vditor--dark .vditor-wysiwyg table,
+          .vditor-container.vditor--dark .vditor-sv table {
+            color: var(--text-color) !important;
+            border-color: var(--border-color) !important;
+          }
+
+          .vditor-container.vditor--dark .vditor-ir th,
+          .vditor-container.vditor--dark .vditor-wysiwyg th,
+          .vditor-container.vditor--dark .vditor-sv th {
+            background-color: #374151 !important;
+            color: #f3f4f6 !important;
+            border-color: var(--border-color) !important;
+          }
+
+          .vditor-container.vditor--dark .vditor-ir td,
+          .vditor-container.vditor--dark .vditor-wysiwyg td,
+          .vditor-container.vditor--dark .vditor-sv td {
+            border-color: var(--border-color) !important;
+          }
+
+          /* Text formatting */
+          .vditor-container.vditor--dark .vditor-ir strong,
+          .vditor-container.vditor--dark .vditor-wysiwyg strong,
+          .vditor-container.vditor--dark .vditor-sv strong,
+          .vditor-container.vditor--dark .vditor-ir b,
+          .vditor-container.vditor--dark .vditor-wysiwyg b,
+          .vditor-container.vditor--dark .vditor-sv b {
+            color: #f3f4f6 !important;
+            font-weight: 700;
+          }
+
+          .vditor-container.vditor--dark .vditor-ir em,
+          .vditor-container.vditor--dark .vditor-wysiwyg em,
+          .vditor-container.vditor--dark .vditor-sv em,
+          .vditor-container.vditor--dark .vditor-ir i,
+          .vditor-container.vditor--dark .vditor-wysiwyg i,
+          .vditor-container.vditor--dark .vditor-sv i {
+            color: #e5e7eb !important;
+          }
+
+          /* HR */
+          .vditor-container.vditor--dark .vditor-ir hr,
+          .vditor-container.vditor--dark .vditor-wysiwyg hr,
+          .vditor-container.vditor--dark .vditor-sv hr {
+            border-color: var(--border-color) !important;
+          }
+
+          /* Images */
+          .vditor-container.vditor--dark .vditor-ir img,
+          .vditor-container.vditor--dark .vditor-wysiwyg img,
+          .vditor-container.vditor--dark .vditor-sv img {
+            background-color: transparent;
+          }
+
+          /* Task lists */
+          .vditor-container.vditor--dark .vditor-ir input[type="checkbox"],
+          .vditor-container.vditor--dark .vditor-wysiwyg input[type="checkbox"],
+          .vditor-container.vditor--dark .vditor-sv input[type="checkbox"] {
+            background-color: #374151;
+            border-color: #4b5563;
+          }
+
+          /* Expand/collapse markers */
+          .vditor-container.vditor--dark .vditor-ir .vditor-ir__node--expand:before,
+          .vditor-container.vditor--dark .vdior-ir .vditor-ir__node--expand:before {
+            border-left-color: var(--border-color);
+            border-right-color: var(--border-color);
+          }
+
+          /* Placeholder text */
+          .vditor-container.vditor--dark .vditor-ir::placeholder,
+          .vditor-container.vditor--dark .vditor-wysiwyg::placeholder {
+            color: #6b7280;
+          }
+
+          /* Selection */
+          .vditor-container.vditor--dark ::selection {
+            background-color: rgba(96, 165, 250, 0.3);
+            color: #f3f4f6;
+          }
+
+          /* Light mode theme */
+          .vditor-container.vditor--classic {
+            --toolbar-background-color: #ffffff;
+            --panel-background-color: #ffffff;
+            --textarea-background-color: #ffffff;
+            --border-color: #e5e7eb;
+            --text-color: #1f2937;
+            --heading-color: #111827;
+            --quote-color: #4b5563;
+            --code-background-color: #f3f4f6;
+            --code-color: #1f2937;
+          }
+        `}
+      </style>
       <div className="bg-background w-full h-full flex flex-col overflow-hidden">
 
         {/* Header */}

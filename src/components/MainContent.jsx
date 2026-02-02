@@ -35,6 +35,16 @@ import { cn } from '../lib/utils';
 const CHAT_PANEL_DEFAULT_WIDTH = 500;
 const CHAT_PANEL_MIN_WIDTH = 250;
 
+function getFileBaseName(filePath) {
+  return filePath.split(/[\\/]/).pop() || filePath;
+}
+
+function isMarkdownFileName(fileName) {
+  if (!fileName) return false;
+  const name = fileName.toLowerCase();
+  return name.endsWith('.md') || name.endsWith('.markdown');
+}
+
 const MainContent = React.memo(React.forwardRef(function MainContent({
   selectedProject,
   selectedSession,
@@ -158,20 +168,16 @@ const MainContent = React.memo(React.forwardRef(function MainContent({
     return [...claudeSessions, ...cursorSessions, ...codexSessions].sort((a, b) => normalizeDate(b) - normalizeDate(a));
   };
 
-  // Helper function to check if a file is a markdown file
-  const isMarkdownFile = useCallback((fileName) => {
-    if (!fileName) return false;
-    const name = fileName.toLowerCase();
-    return name.endsWith('.md') || name.endsWith('.markdown');
-  }, []);
+  const isMarkdownFile = useCallback(isMarkdownFileName, []);
 
   const handleFileOpen = async (filePath, diffInfo = null, projectNameOverride = null) => {
     // Create a file object that CodeEditor expects
+    const projectName = projectNameOverride || selectedProject?.name;
     const nextFile = {
-      name: filePath.split(/[\\/]/).pop(),
+      name: getFileBaseName(filePath),
       path: filePath,
-      projectName: projectNameOverride || selectedProject?.name,
-      diffInfo: diffInfo // Pass along diff information if available
+      projectName,
+      diffInfo // Pass along diff information if available
     };
 
     if (editingFile?.projectName === nextFile.projectName && editingFile?.path === nextFile.path) {
@@ -193,7 +199,7 @@ const MainContent = React.memo(React.forwardRef(function MainContent({
 
   const showChatPanel = activeTab === 'chat' && (!isMobile || !editingFile);
   const editorProjectPath = useMemo(() => {
-    const editorProject = projects?.find(p => p.name === editingFile?.projectName) || selectedProject;
+    const editorProject = projects?.find((p) => p.name === editingFile?.projectName) || selectedProject;
     return editorProject?.path;
   }, [projects, selectedProject, editingFile?.projectName]);
 

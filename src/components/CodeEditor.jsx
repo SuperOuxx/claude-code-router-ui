@@ -14,17 +14,15 @@ import { X, Save, Download, Maximize2, Minimize2, AlertTriangle } from 'lucide-r
 import { api } from '../utils/api';
 import { useTranslation } from 'react-i18next';
 import { loadVditor } from '../lib/vditorLoader';
+import { useTheme } from '../contexts/ThemeContext';
 
 const CodeEditor = React.forwardRef(function CodeEditor({ file, onClose, projectPath, isSidebar = false, isExpanded = false, onToggleExpand = null, isActive = true, onDirtyChange = null }, ref) {
   const { t } = useTranslation('codeEditor');
+  const { isDarkMode } = useTheme(); // Use app theme instead of separate editor theme
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem('codeEditorTheme');
-    return savedTheme ? savedTheme === 'dark' : true;
-  });
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showDiff, setShowDiff] = useState(!!file.diffInfo);
   const [wordWrap, setWordWrap] = useState(() => {
@@ -598,11 +596,6 @@ const CodeEditor = React.forwardRef(function CodeEditor({ file, onClose, project
     setIsFullscreen(!isFullscreen);
   };
 
-  // Save theme preference to localStorage
-  useEffect(() => {
-    localStorage.setItem('codeEditorTheme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
-
   // Save word wrap preference to localStorage
   useEffect(() => {
     localStorage.setItem('codeEditorWordWrap', wordWrap.toString());
@@ -610,12 +603,7 @@ const CodeEditor = React.forwardRef(function CodeEditor({ file, onClose, project
 
   // Listen for settings changes from the Settings modal
   useEffect(() => {
-    const handleStorageChange = () => {
-      const newTheme = localStorage.getItem('codeEditorTheme');
-      if (newTheme) {
-        setIsDarkMode(newTheme === 'dark');
-      }
-
+    const handleStorageChange = (e) => {
       const newWordWrap = localStorage.getItem('codeEditorWordWrap');
       if (newWordWrap !== null) {
         setWordWrap(newWordWrap === 'true');

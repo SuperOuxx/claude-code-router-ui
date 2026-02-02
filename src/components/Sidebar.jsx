@@ -58,7 +58,7 @@ function Sidebar({
   loadingProgress,
   onRefresh,
   onShowSettings,
-  onFileOpen,
+  onFileOpen = null,
   updateAvailable,
   latestVersion,
   currentVersion,

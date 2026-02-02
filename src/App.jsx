@@ -580,9 +580,11 @@ function AppContent() {
     }
   }, []);
 
-  const handleSidebarFileOpen = useCallback((filePath, diffInfo = null, projectNameOverride = null) => {
+  const handleSidebarFileOpen = useCallback(function handleSidebarFileOpen(filePath, diffInfo = null, projectNameOverride = null) {
     mainContentRef.current?.openFile?.(filePath, diffInfo, projectNameOverride);
-    if (isMobile) setSidebarOpen(false);
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
   }, [isMobile]);
 
   // Version Upgrade Modal Component

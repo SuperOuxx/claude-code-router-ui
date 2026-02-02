@@ -161,7 +161,7 @@ function FileTree({ selectedProject, onFileOpen = null }) {
   };
 
   const openProjectFile = (file, { newTab = false } = {}) => {
-    if (onFileOpen) {
+    if (typeof onFileOpen === 'function') {
       onFileOpen(file.path);
       return;
     }

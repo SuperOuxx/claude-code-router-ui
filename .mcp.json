@@ -1,0 +1,30 @@
+{
+    "mcpServers": {
+        "playwright": {
+            "args": [
+                "/c",
+                "node",
+                "C:/Users/Administrator/AppData/Roaming/npm/node_modules/@executeautomation/playwright-mcp-server/dist/index.js"
+            ],
+            "command": "cmd"
+        },
+
+        "mcp_server_mysql": {
+            "args": [
+                "C:/Users/Administrator/AppData/Roaming/npm/node_modules/@benborla29/mcp-server-mysql/dist/index.js"
+            ],
+            "command": "node",
+            "env": {
+                "ALLOW_DDL_OPERATION": "true",
+                "ALLOW_DELETE_OPERATION": "false",
+                "ALLOW_INSERT_OPERATION": "false",
+                "ALLOW_UPDATE_OPERATION": "false",
+                "MYSQL_DB": "interest",
+                "MYSQL_HOST": "42.194.162.131",
+                "MYSQL_PASS": "interestBs2cK8uAWAi96dTamHzZ",
+                "MYSQL_PORT": "3306",
+                "MYSQL_USER": "interest"
+            }
+        }
+    }
+}
