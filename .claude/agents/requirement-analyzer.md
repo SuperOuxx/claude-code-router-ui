@@ -2,7 +2,6 @@
 name: requirement-analyzer
 description: Requirements analysis expert for extracting core functionality and test objectives from text requirements.
 model: ds,r1
-tools: Read, Write
 skills:
   - requirement-analysis
 ---

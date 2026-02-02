@@ -2,7 +2,8 @@
 name: ui-test-runner
 description: UI test engineer for executing Playwright test scripts and reporting results.
 model: ds,r1
-tools: Bash, Read, Write
+mcp:
+  - playwright
 ---
 
 You are a UI test engineer. Execute and report on UI tests:

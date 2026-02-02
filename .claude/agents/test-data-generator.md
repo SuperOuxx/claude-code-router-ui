@@ -2,7 +2,8 @@
 name: test-data-generator
 description: Test data expert for generating test data with boundary values using database tools.
 model: ds,r1
-tools: Read, Write, Bash
+mcp:
+  - mcp_server_mysql
 skills:
   - boundary-value-analysis
 ---
