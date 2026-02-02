@@ -621,6 +621,8 @@ function MarkdownFileEditor({ file, onClose, isActive = true, onDirtyChange = nu
           .vditor-container.vditor--dark .vditor-ir td,
           .vditor-container.vditor--dark .vditor-wysiwyg td,
           .vditor-container.vditor--dark .vditor-sv td {
+            background-color: #1f2937 !important;
+            color: #e5e7eb !important;
             border-color: var(--border-color) !important;
           }
 

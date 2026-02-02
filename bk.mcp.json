@@ -1,11 +1,12 @@
 {
     "mcpServers": {
         "playwright": {
-            "command": "npx",
             "args": [
-                "-y", "@playwright/mcp@latest"
+                "/c",
+                "node",
+                "C:/Users/Administrator/AppData/Roaming/npm/node_modules/@executeautomation/playwright-mcp-server/dist/index.js"
             ],
-            "description": "UI automated testing. Web scraping and crawling"
+            "command": "cmd"
         },
 
         "mcp_server_mysql": {
@@ -14,7 +15,7 @@
             ],
             "command": "node",
             "env": {
-                "ALLOW_DDL_OPERATION": "false",
+                "ALLOW_DDL_OPERATION": "true",
                 "ALLOW_DELETE_OPERATION": "false",
                 "ALLOW_INSERT_OPERATION": "false",
                 "ALLOW_UPDATE_OPERATION": "false",
@@ -23,8 +24,7 @@
                 "MYSQL_PASS": "password",
                 "MYSQL_PORT": "3306",
                 "MYSQL_USER": "user"
-            },
-            "description": "database (MySQL) operations"
+            }
         }
     }
 }
