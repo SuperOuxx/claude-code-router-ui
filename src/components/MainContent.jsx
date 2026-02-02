@@ -13,7 +13,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown, Plus, X } from 'lucide-react';
 import ChatInterface from './ChatInterface';
 import CodeEditor from './CodeEditor';
 import MarkdownFileEditor from './MarkdownFileEditor';
@@ -78,7 +78,8 @@ const MainContent = React.memo(React.forwardRef(function MainContent({
   onNewSession            // Create new session handler
 }, ref) {
   const { t } = useTranslation();
-  const [editingFile, setEditingFile] = useState(null);
+  const [openFiles, setOpenFiles] = useState([]);
+  const [activeFileId, setActiveFileId] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [editorWidth, setEditorWidth] = useState(null); // null means fill available space
@@ -170,32 +171,104 @@ const MainContent = React.memo(React.forwardRef(function MainContent({
 
   const isMarkdownFile = useCallback(isMarkdownFileName, []);
 
+  // Generate a unique ID for each file tab
+  const generateFileId = (filePath, projectName) => {
+    return `${projectName}:${filePath}`;
+  };
+
   const handleFileOpen = async (filePath, diffInfo = null, projectNameOverride = null) => {
     // Create a file object that CodeEditor expects
     const projectName = projectNameOverride || selectedProject?.name;
+    const fileId = generateFileId(filePath, projectName);
+
     const nextFile = {
+      id: fileId,
       name: getFileBaseName(filePath),
       path: filePath,
       projectName,
       diffInfo // Pass along diff information if available
     };
 
-    if (editingFile?.projectName === nextFile.projectName && editingFile?.path === nextFile.path) {
+    // Check if file is already open
+    const existingFileIndex = openFiles.findIndex(f => f.id === fileId);
+
+    if (existingFileIndex !== -1) {
+      // File is already open, just switch to it
+      setActiveFileId(fileId);
       return;
     }
 
-    if (editingFile && codeEditorRef.current?.prepareForSwitch) {
+    // Check if we need to prepare for switching (unsaved changes)
+    const activeFile = openFiles.find(f => f.id === activeFileId);
+    if (activeFile && codeEditorRef.current?.prepareForSwitch) {
       const ok = await codeEditorRef.current.prepareForSwitch();
       if (!ok) return;
     }
 
-    setEditingFile(nextFile);
+    // Add new file to open files
+    setOpenFiles(prev => [...prev, nextFile]);
+    setActiveFileId(fileId);
   };
 
   const handleCloseEditor = () => {
-    setEditingFile(null);
-    setEditorExpanded(false);
+    // Close active file tab
+    if (activeFileId) {
+      setOpenFiles(prev => {
+        const newFiles = prev.filter(f => f.id !== activeFileId);
+        // If there are still files open, activate the last one or the one before the closed one
+        if (newFiles.length > 0) {
+          const closedIndex = prev.findIndex(f => f.id === activeFileId);
+          const nextActiveIndex = closedIndex > 0 ? closedIndex - 1 : 0;
+          setActiveFileId(newFiles[nextActiveIndex].id);
+        } else {
+          setActiveFileId(null);
+        }
+        return newFiles;
+      });
+    }
   };
+
+  const handleCloseFileTab = (fileId, e) => {
+    e.stopPropagation(); // Prevent switching to this tab when closing
+
+    setOpenFiles(prev => {
+      const newFiles = prev.filter(f => f.id !== fileId);
+
+      // If we closed the active file, activate another one
+      if (fileId === activeFileId) {
+        if (newFiles.length > 0) {
+          const closedIndex = prev.findIndex(f => f.id === fileId);
+          const nextActiveIndex = closedIndex > 0 ? closedIndex - 1 : 0;
+          setActiveFileId(newFiles[nextActiveIndex].id);
+        } else {
+          setActiveFileId(null);
+        }
+      }
+
+      return newFiles;
+    });
+  };
+
+  const handleSwitchFileTab = (fileId) => {
+    const activeFile = openFiles.find(f => f.id === activeFileId);
+    if (activeFile && codeEditorRef.current?.prepareForSwitch) {
+      codeEditorRef.current.prepareForSwitch().then(ok => {
+        if (ok) {
+          setActiveFileId(fileId);
+        }
+      });
+    } else {
+      setActiveFileId(fileId);
+    }
+  };
+
+  // Get the currently active file object
+  const activeFile = useMemo(() => {
+    return openFiles.find(f => f.id === activeFileId) || null;
+  }, [openFiles, activeFileId]);
+
+  // Keep backward compatibility - use activeFile instead of editingFile
+  const editingFile = activeFile;
 
   const showChatPanel = activeTab === 'chat' && (!isMobile || !editingFile);
   const editorProjectPath = useMemo(() => {
@@ -640,6 +713,33 @@ const MainContent = React.memo(React.forwardRef(function MainContent({
         >
           {editingFile ? (
               <>
+                {/* File Tabs Bar */}
+                {openFiles.length > 0 && (
+                  <div className="flex items-center bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                    <div className="flex">
+                      {openFiles.map((file) => (
+                        <div
+                          key={file.id}
+                          onClick={() => handleSwitchFileTab(file.id)}
+                          className={`group flex items-center gap-2 px-3 py-2 text-sm border-r border-gray-200 dark:border-gray-700 cursor-pointer transition-colors min-w-[120px] max-w-[200px] ${
+                            file.id === activeFileId
+                              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-t-2 border-t-blue-500'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          <span className="truncate flex-1">{file.name}</span>
+                          <button
+                            onClick={(e) => handleCloseFileTab(file.id, e)}
+                            className="opacity-0 group-hover:opacity-100 hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-0.5 transition-all"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Resize handle - only show when editor is not expanded */}
                 {!editorExpanded && (
                   <div
