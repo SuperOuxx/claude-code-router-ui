@@ -150,7 +150,11 @@
       "jsonConfig": "JSON 配置",
       "url": "URL",
       "envVars": "环境变量（KEY=值，每行一个）",
+      "envVarsHelp": "支持环境变量扩展：",
+      "envVarsSyntax": "使用 ${VAR} 引用环境变量，或使用 ${VAR:-default} 提供默认值。",
+      "envVarsExample": "示例：MYSQL_HOST=${MYSQL_HOST:-localhost}",
       "headers": "请求头（KEY=值，每行一个）",
+      "headersHelp": "支持环境变量扩展（例如：Authorization=Bearer ${API_TOKEN}）",
       "selectProject": "选择项目..."
     },
     "placeholders": {

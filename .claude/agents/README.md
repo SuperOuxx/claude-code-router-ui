@@ -9,8 +9,8 @@ graph TD
     A用户请求 -->|是否含图片| B[CCR 路由判断]
     B -->|是| C[prototype-analyzer<br/>视觉模型解析原型]
     B -->|否| D[requirement-analyzer<br/>文本模型分析需求]
-    C --> E[test-planner<br/>生成测试计划]
-    D --> E
+    C --> D
+    D --> E[test-planner<br/>生成测试计划]
     E --> F[test-case-designer<br/>设计测试用例]
     F --> G[test-data-generator<br/>数据库MCP生成测试数据]
     G --> H[bdd-test-expert<br/>生成BDD feature文件]

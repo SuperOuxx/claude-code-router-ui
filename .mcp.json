@@ -14,15 +14,15 @@
             ],
             "command": "node",
             "env": {
-                "ALLOW_DDL_OPERATION": "false",
-                "ALLOW_DELETE_OPERATION": "false",
-                "ALLOW_INSERT_OPERATION": "false",
-                "ALLOW_UPDATE_OPERATION": "false",
-                "MYSQL_DB": "db",
-                "MYSQL_HOST": "ip",
-                "MYSQL_PASS": "password",
-                "MYSQL_PORT": "3306",
-                "MYSQL_USER": "user"
+                "ALLOW_DDL_OPERATION": "${ALLOW_DDL_OPERATION:-false}",
+                "ALLOW_DELETE_OPERATION": "${ALLOW_DELETE_OPERATION:-false}",
+                "ALLOW_INSERT_OPERATION": "${ALLOW_INSERT_OPERATION:-false}",
+                "ALLOW_UPDATE_OPERATION": "${ALLOW_UPDATE_OPERATION:-false}",
+                "MYSQL_HOST": "${MYSQL_HOST:-localhost}",
+                "MYSQL_PORT": "${MYSQL_PORT:-3306}",
+                "MYSQL_USER": "${MYSQL_USER:-root}",
+                "MYSQL_PASS": "${MYSQL_PASS}",
+                "MYSQL_DB": "${MYSQL_DB:-mydb}"
             },
             "description": "MySQL database operations for test data generation"
         }

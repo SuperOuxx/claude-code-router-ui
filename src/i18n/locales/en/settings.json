@@ -150,7 +150,11 @@
       "jsonConfig": "JSON Configuration",
       "url": "URL",
       "envVars": "Environment Variables (KEY=value, one per line)",
+      "envVarsHelp": "Supports environment variable expansion:",
+      "envVarsSyntax": "Use ${VAR} to reference environment variables, or ${VAR:-default} to provide a default value.",
+      "envVarsExample": "Example: MYSQL_HOST=${MYSQL_HOST:-localhost}",
       "headers": "Headers (KEY=value, one per line)",
+      "headersHelp": "Supports environment variable expansion (e.g., Authorization=Bearer ${API_TOKEN})",
       "selectProject": "Select a project..."
     },
     "placeholders": {
