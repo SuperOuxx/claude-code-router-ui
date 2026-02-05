@@ -1,10 +1,12 @@
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { LogIn } from 'lucide-react';
+import { LogIn, Settings as SettingsIcon } from 'lucide-react';
 import ClaudeLogo from '../ClaudeLogo';
 import CursorLogo from '../CursorLogo';
 import CodexLogo from '../CodexLogo';
 import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
+import { authenticatedFetch } from '../../utils/api';
 
 const agentConfig = {
   claude: {
@@ -43,6 +45,37 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
   const { t } = useTranslation('settings');
   const config = agentConfig[agent];
   const { Logo } = config;
+
+  // CCR UI configuration state
+  const [isCcrExecuting, setIsCcrExecuting] = useState(false);
+  const [ccrOutput, setCcrOutput] = useState('');
+
+  const handleCcrUi = async () => {
+    setIsCcrExecuting(true);
+    setCcrOutput('Launching CCR UI configuration...\n');
+
+    try {
+      const response = await authenticatedFetch('/api/system/ccr-ui', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setCcrOutput(prev => prev + data.output + '\n');
+        setCcrOutput(prev => prev + '\n✅ ' + (data.message || 'CCR UI launched successfully') + '\n');
+      } else {
+        setCcrOutput(prev => prev + '\n❌ Failed: ' + (data.error || 'Unknown error') + '\n');
+        if (data.errorOutput) {
+          setCcrOutput(prev => prev + data.errorOutput + '\n');
+        }
+      }
+    } catch (error) {
+      setCcrOutput(prev => prev + '\n❌ Error: ' + error.message + '\n');
+    } finally {
+      setIsCcrExecuting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -117,6 +150,49 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
               <div className="text-sm text-red-600 dark:text-red-400">
                 {t('agents.error', { error: authStatus.error })}
               </div>
+            </div>
+          )}
+
+          {/* CCR Configuration - Only for Claude */}
+          {agent === 'claude' && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className={`font-medium ${config.textClass}`}>
+                    CCR Configuration
+                  </div>
+                  <div className={`text-sm ${config.subtextClass}`}>
+                    Launch CCR UI configuration interface
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCcrUi}
+                  disabled={isCcrExecuting}
+                  className={`${config.buttonClass} text-white`}
+                  size="sm"
+                >
+                  {isCcrExecuting ? (
+                    <>
+                      <div className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <SettingsIcon className="w-4 h-4 mr-2" />
+                      Configure CCR
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* CCR Output */}
+              {ccrOutput && (
+                <div className="mt-4">
+                  <div className="bg-gray-900 dark:bg-gray-950 rounded-lg p-4 border border-gray-700 max-h-48 overflow-y-auto">
+                    <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{ccrOutput}</pre>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -60,10 +60,10 @@ async function cleanupTempFiles(tempImagePaths, tempDir) {
   }
 
   for (const imagePath of tempImagePaths) {
-    await fs.unlink(imagePath).catch(() => {});
+    await fs.unlink(imagePath).catch(() => { });
   }
   if (tempDir) {
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
   }
 }
 

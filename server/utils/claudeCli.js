@@ -1,4 +1,9 @@
 import { parse as parseShellCommand, quote as quoteShellCommand } from 'shell-quote';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Regex to match both ccr (claude-code-router) and official claude CLI
 const CCR_COMMAND_REGEX = /(?:^|[\\/])(?:ccr|claude)(?:\\.exe)?$/i;
@@ -42,16 +47,38 @@ function quotePowerShellToken(token) {
   return `'${safe}'`;
 }
 
+/**
+ * Resolve command path with support for:
+ * - Environment variable expansion (${VAR_NAME})
+ * - Command names and absolute paths (returned as-is)
+ */
+function resolveCommandPath(command) {
+  if (!command || typeof command !== 'string') {
+    return command;
+  }
+
+  // Handle environment variable expansion like ${CCR_PATH}
+  const expanded = command.replace(/\$\{(\w+)\}/g, (match, varName) => {
+    return process.env[varName] || match;
+  });
+
+  return expanded;
+}
+
 export function getClaudeCliCommand() {
   const commandFromSingleVar = parseCliTokens(process.env.CLAUDE_CLI_COMMAND);
   if (commandFromSingleVar.length > 0) {
     const [command, ...argsPrefix] = commandFromSingleVar;
-    return { command, argsPrefix };
+    // Resolve the command path (supports relative paths, env vars, etc.)
+    const resolvedCommand = resolveCommandPath(command);
+    return { command: resolvedCommand, argsPrefix };
   }
 
   const command = normalizeEnvValue(process.env.CLAUDE_CLI_PATH) || 'claude';
   const argsPrefix = parseCliTokens(process.env.CLAUDE_CLI_ARGS);
-  return { command, argsPrefix };
+  // Resolve the command path for CLAUDE_CLI_PATH as well
+  const resolvedCommand = resolveCommandPath(command);
+  return { command: resolvedCommand, argsPrefix };
 }
 
 export function getClaudeCliTokens(extraArgs = []) {
