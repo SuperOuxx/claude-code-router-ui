@@ -19,7 +19,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { Settings as SettingsIcon, Sparkles } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -1043,6 +1043,7 @@ function AppContent() {
 
       {/* Version Upgrade Modal */}
       <VersionUpgradeModal />
+      <Outlet />
     </div>
   );
 }
@@ -1061,8 +1062,9 @@ function App() {
                 <ProtectedRoute>
                   <Router basename={window.__ROUTER_BASENAME__ || ''}>
                     <Routes>
-                      <Route path="/" element={<AppContent />} />
-                      <Route path="/session/:sessionId" element={<AppContent />} />
+                      <Route path="/" element={<AppContent />}>
+                        <Route path="session/:sessionId" element={<></>} />
+                      </Route>
                     </Routes>
                   </Router>
                 </ProtectedRoute>

@@ -3220,9 +3220,21 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
   // Update chatMessages when convertedMessages changes
   useEffect(() => {
     if (sessionMessages.length > 0) {
-      setChatMessages(convertedMessages);
+      setChatMessages(prev => {
+        // Never replace visible messages with an empty converted set.
+        // This can happen briefly for new sessions when the persisted JSONL
+        // has only system/init lines (filtered by convertSessionMessages) or
+        // when the JSONL write lags behind the UI stream.
+        if (prev.length > 0 && convertedMessages.length === 0) {
+          return prev;
+        }
+        if (isLoading && prev.length > 0) {
+          return prev;
+        }
+        return convertedMessages;
+      });
     }
-  }, [convertedMessages, sessionMessages]);
+  }, [convertedMessages, sessionMessages, isLoading]);
 
   // Notify parent when input focus changes
   useEffect(() => {
