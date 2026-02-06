@@ -1933,7 +1933,8 @@ app.get('*', (req, res) => {
         res.sendFile(indexPath);
     } else {
         // In development, redirect to Vite dev server only if dist doesn't exist
-        res.redirect(`http://localhost:${process.env.VITE_PORT || 5173}`);
+        // Preserve the original path/query so deep links like `/session/:id` don't get dropped.
+        res.redirect(`http://localhost:${process.env.VITE_PORT || 5173}${req.originalUrl}`);
     }
 });
 

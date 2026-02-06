@@ -19,7 +19,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Settings as SettingsIcon, Sparkles } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -43,6 +43,7 @@ import i18n from './i18n/config.js';
 // Main App component with routing
 function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { sessionId } = useParams();
   const { t } = useTranslation('common');
 
@@ -86,9 +87,34 @@ function AppContent() {
   // Ref to track loading progress timeout for cleanup
   const loadingProgressTimeoutRef = useRef(null);
   const mainContentRef = useRef(null);
+  const lastSessionIdRef = useRef(null);
+  const lastUserGestureAtRef = useRef(0);
+
+  const navigateWithDevTrace = useCallback((to, options) => {
+    if (import.meta.env.DEV && to === '/') {
+      console.groupCollapsed('[router] navigate(/)');
+      console.trace();
+      console.groupEnd();
+    }
+    navigate(to, options);
+  }, [navigate]);
 
   // Detect if running as PWA
   const [isPWA, setIsPWA] = useState(false);
+
+  useEffect(() => {
+    const markGesture = () => {
+      lastUserGestureAtRef.current = Date.now();
+    };
+
+    window.addEventListener('pointerdown', markGesture, { capture: true });
+    window.addEventListener('keydown', markGesture, { capture: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', markGesture, { capture: true });
+      window.removeEventListener('keydown', markGesture, { capture: true });
+    };
+  }, []);
 
   useEffect(() => {
     // Check if running in standalone mode (PWA)
@@ -134,6 +160,17 @@ function AppContent() {
     // Fetch projects on component mount
     fetchProjects();
   }, []);
+
+  // Persist the last visited session so we can recover from accidental route resets.
+  useEffect(() => {
+    if (!sessionId) return;
+    lastSessionIdRef.current = sessionId;
+    try {
+      sessionStorage.setItem('lastSessionId', sessionId);
+    } catch {
+      // ignore storage errors (private mode / quota)
+    }
+  }, [sessionId]);
 
   // Helper function to determine if an update is purely additive (new sessions/projects)
   // vs modifying existing selected items that would interfere with active conversations
@@ -260,7 +297,8 @@ function AppContent() {
               const allSessions = [
                 ...(updatedSelectedProject.sessions || []),
                 ...(updatedSelectedProject.codexSessions || []),
-                ...(updatedSelectedProject.cursorSessions || [])
+                ...(updatedSelectedProject.cursorSessions || []),
+                ...(updatedSelectedProject.geminiSessions || [])
               ];
               const updatedSelectedSession = allSessions.find(s => s.id === selectedSession.id);
               if (!updatedSelectedSession) {
@@ -351,6 +389,32 @@ function AppContent() {
     setShowSettings(true);
   }, []);
 
+  // If we're actively processing a session and the URL accidentally resets to `/`,
+  // restore the user back to the last session route.
+  useEffect(() => {
+    if (sessionId) return;
+    if (location.pathname !== '/') return;
+
+    let lastSessionId = lastSessionIdRef.current;
+    if (!lastSessionId) {
+      try {
+        lastSessionId = sessionStorage.getItem('lastSessionId');
+      } catch {
+        lastSessionId = null;
+      }
+    }
+
+    if (!lastSessionId) return;
+
+    const isSessionBusy = activeSessions.has(lastSessionId) || processingSessions.has(lastSessionId);
+    if (!isSessionBusy) return;
+
+    // If the user just interacted (e.g. clicked "New Session"), don't fight their navigation.
+    if (Date.now() - lastUserGestureAtRef.current < 1500) return;
+
+    navigate(`/session/${lastSessionId}`, { replace: true });
+  }, [activeSessions, location.pathname, navigate, processingSessions, sessionId]);
+
   // Handle URL-based session loading
   useEffect(() => {
     if (sessionId && projects.length > 0) {
@@ -379,18 +443,34 @@ function AppContent() {
           setActiveTab('chat');
           return;
         }
+        // Also check Codex sessions
+        const codexSession = project.codexSessions?.find(s => s.id === sessionId);
+        if (codexSession) {
+          setSelectedProject(project);
+          setSelectedSession({ ...codexSession, __provider: 'codex' });
+          setActiveTab('chat');
+          return;
+        }
+        // Also check Gemini sessions
+        const geminiSession = project.geminiSessions?.find(s => s.id === sessionId);
+        if (geminiSession) {
+          setSelectedProject(project);
+          setSelectedSession({ ...geminiSession, __provider: 'gemini' });
+          setActiveTab('chat');
+          return;
+        }
       }
 
       // If session not found, it might be a newly created session
       // Just navigate to it and it will be found when the sidebar refreshes
       // Don't redirect to home, let the session load naturally
     }
-  }, [sessionId, projects, navigate]);
+  }, [sessionId, projects, navigate, selectedSession]);
 
   const handleProjectSelect = (project) => {
     setSelectedProject(project);
     setSelectedSession(null);
-    navigate('/');
+    navigateWithDevTrace('/');
     if (isMobile) {
       setSidebarOpen(false);
     }
@@ -430,7 +510,7 @@ function AppContent() {
     setSelectedProject(project);
     setSelectedSession(null);
     setActiveTab('chat');
-    navigate('/');
+    navigateWithDevTrace('/');
     if (isMobile) {
       setSidebarOpen(false);
     }
@@ -440,7 +520,7 @@ function AppContent() {
     // If the deleted session was currently selected, clear it
     if (selectedSession?.id === sessionId) {
       setSelectedSession(null);
-      navigate('/');
+      navigateWithDevTrace('/');
     }
 
     // Update projects state locally instead of full refresh
@@ -511,7 +591,7 @@ function AppContent() {
     if (selectedProject?.name === projectName) {
       setSelectedProject(null);
       setSelectedSession(null);
-      navigate('/');
+      navigateWithDevTrace('/');
     }
 
     // Update projects state locally instead of full refresh
