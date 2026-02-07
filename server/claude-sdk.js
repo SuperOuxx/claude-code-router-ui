@@ -345,7 +345,15 @@ async function handleImages(command, images, cwd) {
       }
 
       const [, mimeType, base64Data] = matches;
-      const extension = mimeType.split('/')[1] || 'png';
+      const extensionMap = {
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'image/svg+xml': 'svg'
+      };
+      const extension = extensionMap[mimeType] || mimeType.split('/')[1] || 'png';
       const filename = `image_${index}.${extension}`;
       const filepath = path.join(tempDir, filename);
 
@@ -354,11 +362,21 @@ async function handleImages(command, images, cwd) {
       tempImagePaths.push(filepath);
     }
 
-    // Include the full image paths in the prompt
+    // Include explicit image instructions + paths in the prompt so the model
+    // reliably inspects attachments via file tools.
     let modifiedCommand = command;
-    if (tempImagePaths.length > 0 && command && command.trim()) {
-      const imageNote = `\n\n[Images provided at the following paths:]\n${tempImagePaths.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
-      modifiedCommand = command + imageNote;
+    if (tempImagePaths.length > 0) {
+      const baseCommand = command && command.trim()
+        ? command
+        : 'Please analyze the attached images.';
+      const imageNote = [
+        '',
+        '[Image attachments]',
+        `The user attached ${tempImagePaths.length} image file(s).`,
+        'You must read these files before answering:',
+        ...tempImagePaths.map((p, i) => `${i + 1}. ${p}`)
+      ].join('\n');
+      modifiedCommand = `${baseCommand}\n\n${imageNote}`;
     }
 
     console.log(`Processed ${tempImagePaths.length} images to temp directory: ${tempDir}`);

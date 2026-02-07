@@ -789,14 +789,14 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                                     {createDiff(input.old_string, input.new_string).map((diffLine, i) => (
                                       <div key={i} className="flex">
                                         <span className={`w-8 text-center border-r ${diffLine.type === 'removed'
-                                            ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
-                                            : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                                          ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                                          : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
                                           }`}>
                                           {diffLine.type === 'removed' ? '-' : '+'}
                                         </span>
                                         <span className={`px-2 py-0.5 flex-1 whitespace-pre-wrap ${diffLine.type === 'removed'
-                                            ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
-                                            : 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+                                          ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+                                          : 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
                                           }`}>
                                           {diffLine.content}
                                         </span>
@@ -936,14 +936,14 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                                       {createDiff('', input.content).map((diffLine, i) => (
                                         <div key={i} className="flex">
                                           <span className={`w-8 text-center border-r ${diffLine.type === 'removed'
-                                              ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
-                                              : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                                            ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                                            : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
                                             }`}>
                                             {diffLine.type === 'removed' ? '-' : '+'}
                                           </span>
                                           <span className={`px-2 py-0.5 flex-1 whitespace-pre-wrap ${diffLine.type === 'removed'
-                                              ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
-                                              : 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
+                                            ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200'
+                                            : 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200'
                                             }`}>
                                             {diffLine.content}
                                           </span>
@@ -1115,19 +1115,19 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                         <div
                           id={`tool-result-${message.toolId}`}
                           className={`relative mt-4 p-4 rounded-lg border backdrop-blur-sm scroll-mt-4 ${message.toolResult.isError
-                              ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 border-red-200/60 dark:border-red-800/60'
-                              : 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200/60 dark:border-green-800/60'
+                            ? 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20 border-red-200/60 dark:border-red-800/60'
+                            : 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200/60 dark:border-green-800/60'
                             }`}>
                           {/* Decorative gradient overlay */}
                           <div className={`absolute inset-0 rounded-lg opacity-50 ${message.toolResult.isError
-                              ? 'bg-gradient-to-br from-red-500/5 to-rose-500/5 dark:from-red-400/5 dark:to-rose-400/5'
-                              : 'bg-gradient-to-br from-green-500/5 to-emerald-500/5 dark:from-green-400/5 dark:to-emerald-400/5'
+                            ? 'bg-gradient-to-br from-red-500/5 to-rose-500/5 dark:from-red-400/5 dark:to-rose-400/5'
+                            : 'bg-gradient-to-br from-green-500/5 to-emerald-500/5 dark:from-green-400/5 dark:to-emerald-400/5'
                             }`}></div>
 
                           <div className="relative flex items-center gap-2.5 mb-3">
                             <div className={`w-6 h-6 rounded-lg flex items-center justify-center shadow-md ${message.toolResult.isError
-                                ? 'bg-gradient-to-br from-red-500 to-rose-600 dark:from-red-400 dark:to-rose-500 shadow-red-500/20'
-                                : 'bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-400 dark:to-emerald-500 shadow-green-500/20'
+                              ? 'bg-gradient-to-br from-red-500 to-rose-600 dark:from-red-400 dark:to-rose-500 shadow-red-500/20'
+                              : 'bg-gradient-to-br from-green-500 to-emerald-600 dark:from-green-400 dark:to-emerald-500 shadow-green-500/20'
                               }`}>
                               <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 {message.toolResult.isError ? (
@@ -1138,16 +1138,16 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                               </svg>
                             </div>
                             <span className={`text-sm font-semibold ${message.toolResult.isError
-                                ? 'text-red-800 dark:text-red-200'
-                                : 'text-green-800 dark:text-green-200'
+                              ? 'text-red-800 dark:text-red-200'
+                              : 'text-green-800 dark:text-green-200'
                               }`}>
                               {message.toolResult.isError ? 'Tool Error' : 'Tool Result'}
                             </span>
                           </div>
 
                           <div className={`relative text-sm ${message.toolResult.isError
-                              ? 'text-red-900 dark:text-red-100'
-                              : 'text-green-900 dark:text-green-100'
+                            ? 'text-red-900 dark:text-red-100'
+                            : 'text-green-900 dark:text-green-100'
                             }`}>
                             {(() => {
                               const content = String(message.toolResult.content || '');
@@ -1317,16 +1317,16 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                                               <button
                                                 key={option.number}
                                                 className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${selectedOption === option.number
-                                                    ? 'bg-amber-600 dark:bg-amber-700 text-white border-amber-600 dark:border-amber-700 shadow-md'
-                                                    : 'bg-white dark:bg-gray-800 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-700 hover:border-amber-400 dark:hover:border-amber-600 hover:shadow-sm'
+                                                  ? 'bg-amber-600 dark:bg-amber-700 text-white border-amber-600 dark:border-amber-700 shadow-md'
+                                                  : 'bg-white dark:bg-gray-800 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-700 hover:border-amber-400 dark:hover:border-amber-600 hover:shadow-sm'
                                                   } ${selectedOption ? 'cursor-default' : 'cursor-not-allowed opacity-75'
                                                   }`}
                                                 disabled
                                               >
                                                 <div className="flex items-center gap-3">
                                                   <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${selectedOption === option.number
-                                                      ? 'bg-white/20'
-                                                      : 'bg-amber-100 dark:bg-amber-800/50'
+                                                    ? 'bg-white/20'
+                                                    : 'bg-amber-100 dark:bg-amber-800/50'
                                                     }`}>
                                                     {option.number}
                                                   </span>
@@ -1510,8 +1510,8 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                                     }}
                                     disabled={permissionSuggestion.isAllowed || permissionGrantState === 'granted'}
                                     className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${permissionSuggestion.isAllowed || permissionGrantState === 'granted'
-                                        ? 'bg-green-100 dark:bg-green-900/30 border-green-300/70 dark:border-green-800/60 text-green-800 dark:text-green-200 cursor-default'
-                                        : 'bg-white/80 dark:bg-gray-900/40 border-red-300/70 dark:border-red-800/60 text-red-700 dark:text-red-200 hover:bg-white dark:hover:bg-gray-900/70'
+                                      ? 'bg-green-100 dark:bg-green-900/30 border-green-300/70 dark:border-green-800/60 text-green-800 dark:text-green-200 cursor-default'
+                                      : 'bg-white/80 dark:bg-gray-900/40 border-red-300/70 dark:border-red-800/60 text-red-700 dark:text-red-200 hover:bg-white dark:hover:bg-gray-900/70'
                                       }`}
                                   >
                                     {permissionSuggestion.isAllowed || permissionGrantState === 'granted'
@@ -1597,15 +1597,15 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
                               <button
                                 key={option.number}
                                 className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${option.isSelected
-                                    ? 'bg-amber-600 dark:bg-amber-700 text-white border-amber-600 dark:border-amber-700 shadow-md'
-                                    : 'bg-white dark:bg-gray-800 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-700'
+                                  ? 'bg-amber-600 dark:bg-amber-700 text-white border-amber-600 dark:border-amber-700 shadow-md'
+                                  : 'bg-white dark:bg-gray-800 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-700'
                                   } cursor-not-allowed opacity-75`}
                                 disabled
                               >
                                 <div className="flex items-center gap-3">
                                   <span className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${option.isSelected
-                                      ? 'bg-white/20'
-                                      : 'bg-amber-100 dark:bg-amber-800/50'
+                                    ? 'bg-white/20'
+                                    : 'bg-amber-100 dark:bg-amber-800/50'
                                     }`}>
                                     {option.number}
                                   </span>
@@ -3384,6 +3384,11 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
             // The temporary session is removed and real session is marked as active
             if (onReplaceTemporarySession) {
               onReplaceTemporarySession(latestMessage.sessionId);
+            }
+
+            // Immediately navigate to the new session URL so the user stays in context
+            if (onNavigateToSession) {
+              onNavigateToSession(latestMessage.sessionId);
             }
 
             // Attach the real session ID to any pending permission requests so they
@@ -5362,8 +5367,8 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                             handlePermissionDecision(matchingRequestIds, { allow: true, rememberEntry: permissionEntry });
                           }}
                           className={`inline-flex items-center gap-2 rounded-md text-xs font-medium px-3 py-1.5 border transition-colors ${permissionEntry
-                              ? 'border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/30'
-                              : 'border-gray-300 text-gray-400 cursor-not-allowed'
+                            ? 'border-amber-300 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/30'
+                            : 'border-gray-300 text-gray-400 cursor-not-allowed'
                             }`}
                           disabled={!permissionEntry}
                         >
@@ -5388,23 +5393,23 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                 type="button"
                 onClick={handleModeSwitch}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all duration-200 ${permissionMode === 'default'
-                    ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    : permissionMode === 'acceptEdits'
-                      ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-100 dark:hover:bg-green-900/30'
-                      : permissionMode === 'bypassPermissions'
-                        ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600 hover:bg-orange-100 dark:hover:bg-orange-900/30'
-                        : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                  ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  : permissionMode === 'acceptEdits'
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-100 dark:hover:bg-green-900/30'
+                    : permissionMode === 'bypassPermissions'
+                      ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600 hover:bg-orange-100 dark:hover:bg-orange-900/30'
+                      : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30'
                   }`}
                 title={t('input.clickToChangeMode')}
               >
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${permissionMode === 'default'
-                      ? 'bg-gray-500'
-                      : permissionMode === 'acceptEdits'
-                        ? 'bg-green-500'
-                        : permissionMode === 'bypassPermissions'
-                          ? 'bg-orange-500'
-                          : 'bg-blue-500'
+                    ? 'bg-gray-500'
+                    : permissionMode === 'acceptEdits'
+                      ? 'bg-green-500'
+                      : permissionMode === 'bypassPermissions'
+                        ? 'bg-orange-500'
+                        : 'bg-blue-500'
                     }`} />
                   <span>
                     {permissionMode === 'default' && t('codex.modes.default')}
@@ -5563,8 +5568,8 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                   <div
                     key={file.path}
                     className={`px-4 py-3 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 touch-manipulation ${index === selectedFileIndex
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                      : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
                       }`}
                     onMouseDown={(e) => {
                       // Prevent textarea from losing focus on mobile
