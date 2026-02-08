@@ -1,34 +1,34 @@
 ---
 name: requirement-analysis
-description: Extract and structure requirements from text descriptions. Use when user provides feature requirements, user stories, or specifications that need to be analyzed and documented.
+description: 从文本描述中提取和构建需求。当用户提供需要分析和文档化的功能需求、用户故事或规范时使用。
 ---
 
-# Requirement Analysis Skill
+# 需求分析技能 (Requirement Analysis Skill)
 
-When analyzing requirements from text descriptions:
+当从文本描述中分析需求时：
 
-1. **Identify Core Functionality**
-   - Extract the main feature being described
-   - Identify user goals and objectives
-   - Note any specific user roles or personas mentioned
+1. **识别核心功能 (Identify Core Functionality)**
+   - 提取描述的主要功能
+   - 识别用户目标和目的
+   - 注意提到的任何特定用户角色或人物画像
 
-2. **Extract Acceptance Criteria**
-   - Look for explicit success criteria
-   - Identify measurable outcomes
-   - Note any performance or quality requirements
+2. **提取验收标准 (Extract Acceptance Criteria)**
+   - 寻找明确的成功标准
+   - 识别可衡量的结果
+   - 注意任何性能或质量要求
 
-3. **Define Scope Boundaries**
-   - **In Scope**: Features explicitly mentioned
-   - **Out Scope**: Features clearly excluded or deferred
-   - **Assumptions**: Implicit requirements or dependencies
+3. **定义范围边界 (Define Scope Boundaries)**
+   - **范围内 (In Scope)**: 明确提到的功能
+   - **范围外 (Out Scope)**: 明确排除或推迟的功能
+   - **假设 (Assumptions)**: 隐含的需求或依赖关系
 
-4. **Identify Constraints**
-   - Technical constraints (platform, technology)
-   - Business constraints (timeline, budget)
-   - User constraints (accessibility, localization)
+4. **识别约束 (Identify Constraints)**
+   - 技术约束（平台、技术）
+   - 业务约束（时间表、预算）
+   - 用户约束（可访问性、本地化）
 
-5. **Output Structure**
-   Provide a structured requirement document:
+5. **输出结构 (Output Structure)**
+   提供结构化的需求文档：
    ```json
    {
      "requirement": {
@@ -46,8 +46,8 @@ When analyzing requirements from text descriptions:
    }
    ```
 
-**Best Practices:**
-- Use the 5W1H method (Who, What, Where, When, Why, How)
-- Focus on user needs and business value
-- Identify both functional and non-functional requirements
-- Highlight any ambiguous or missing information
+**最佳实践:**
+- 使用 5W1H 方法 (Who, What, Where, When, Why, How)
+- 关注用户需求和业务价值
+- 识别功能性和非功能性需求
+- 突出显示任何含糊不清或缺失的信息

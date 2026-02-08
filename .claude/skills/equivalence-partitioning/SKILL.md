@@ -1,30 +1,30 @@
 ---
 name: equivalence-partitioning
-description: Divide inputs into equivalence classes to reduce test cases while maintaining coverage. Use when optimizing test suites or dealing with large input domains.
+description: 将输入划分为等价类，以在保持覆盖率的同时减少测试用例。在优化测试套件或处理大型输入域时使用。
 ---
 
-# Equivalence Partitioning Skill
+# 等价类划分技能 (Equivalence Partitioning Skill)
 
-Equivalence Partitioning (EP) is a black-box testing technique that divides input data into groups (partitions) that are expected to be processed similarly, allowing you to test one value from each partition instead of all possible values.
+等价类划分 (EP) 是一种黑盒测试技术，它将输入数据划分为预期处理方式相似的组（分区），允许你从每个分区测试一个值，而不是所有可能的值。
 
-## Core Concept
+## 核心概念
 
-If one test case from an equivalence class detects a defect, all other test cases from that class would likely detect the same defect. Conversely, if one test case passes, all others in that class should pass.
+如果等价类中的一个测试用例检测到缺陷，则该类中的所有其他测试用例很可能检测到相同的缺陷。反之，如果一个测试用例通过，该类中的所有其他测试用例也应该通过。
 
-## When to Use
-- Large input domains (too many possible values to test all)
-- Numeric ranges
-- String formats and patterns
-- Sets of valid/invalid values
-- Menu selections and dropdown options
-- Date ranges and time periods
+## 何时使用
+- 大型输入域（可能的值太多而无法全部测试）
+- 数字范围
+- 字符串格式和模式
+- 这是一个有效/无效值的集合
+- 菜单选择和下拉选项
+- 日期范围和时间段
 
-## Partition Types
+## 分区类型
 
-### 1. Valid Equivalence Partitions
-Values that should be accepted by the system.
+### 1. 有效等价类划分 (Valid Equivalence Partitions)
+系统应该接受的值。
 
-**Example**: Age input (1-120)
+**示例**: 年龄输入 (1-120)
 ```json
 {
   "valid_partitions": [
@@ -44,10 +44,10 @@ Values that should be accepted by the system.
 }
 ```
 
-### 2. Invalid Equivalence Partitions
-Values that should be rejected by the system.
+### 2. 无效等价类划分 (Invalid Equivalence Partitions)
+系统应该拒绝的值。
 
-**Example**: Age input (1-120)
+**示例**: 年龄输入 (1-120)
 ```json
 {
   "invalid_partitions": [
@@ -73,10 +73,10 @@ Values that should be rejected by the system.
 }
 ```
 
-## Partitioning Guidelines
+## 划分指南
 
-### By Numeric Range
-**Example**: Salary range ($20,000 - $100,000)
+### 按数字范围 (By Numeric Range)
+**示例**: 薪资范围 ($20,000 - $100,000)
 ```
 Valid partitions:
   - $20,000 (minimum)
@@ -90,8 +90,8 @@ Invalid partitions:
   - Non-numeric
 ```
 
-### By String Format
-**Example**: Email address
+### 按字符串格式 (By String Format)
+**示例**: 电子邮件地址
 ```
 Valid partitions:
   - Standard format: user@domain.com
@@ -107,8 +107,8 @@ Invalid partitions:
   - Spaces in email
 ```
 
-### By Set Membership
-**Example**: Gender selection
+### 按集合成员 (By Set Membership)
+**示例**: 性别选择
 ```
 Valid partitions:
   - Male
@@ -120,8 +120,8 @@ Invalid partitions:
   - Any other value
 ```
 
-### By Data Type
-**Example**: Phone number
+### 按数据类型 (By Data Type)
+**示例**: 电话号码
 ```
 Valid partition: Digits only, 10 digits
 Invalid partitions:
@@ -132,12 +132,12 @@ Invalid partitions:
   - Empty/null
 ```
 
-## Test Case Selection Strategy
+## 测试用例选择策略
 
-### Strategy 1: One Value Per Partition
-Test one representative value from each partition (valid and invalid).
+### 策略 1: 每个分区一个值
+测试每个分区（有效和无效）的一个代表值。
 
-**Example**: Username (4-16 alphanumeric)
+**示例**: 用户名 (4-16 个字母数字)
 ```json
 {
   "test_cases": [
@@ -152,22 +152,22 @@ Test one representative value from each partition (valid and invalid).
 }
 ```
 
-## Combining with Boundary Value Analysis
+## 结合边界值分析
 
-**Best Practice**: Use Equivalence Partitioning with Boundary Value Analysis for comprehensive coverage.
+**最佳实践**: 结合使用等价类划分和边界值分析，以获得全面的覆盖率。
 
-**Example**: Test score (0-100)
+**示例**: 测试分数 (0-100)
 
-| Partition Type | Partition | Test Values |
+| 分区类型 | 分区 | 测试值 |
 |---------------|-----------|-------------|
 | Valid | [0, 100] | 0, 1, 50, 99, 100 |
 | Invalid | < 0 | -1 |
 | Invalid | > 100 | 101 |
 | Invalid | Non-numeric | "abc" |
 
-## Output Format
+## 输出格式
 
-When applying equivalence partitioning:
+当应用等价类划分时：
 
 ```json
 {
@@ -231,29 +231,29 @@ When applying equivalence partitioning:
 }
 ```
 
-## Best Practices
+## 最佳实践
 
-1. **DO:**
-   - Identify both valid and invalid partitions
-   - Consider all input conditions and constraints
-   - Choose representative values that are typical for each partition
-   - Document the reasoning behind each partition
-   - Combine with boundary value analysis for robust testing
-   - Review partitions with stakeholders to ensure completeness
+1. **DO ✅:**
+   - 识别有效和无效分区
+   - 考虑所有输入条件和约束
+   - 选择每个分区的典型代表值
+   - 记录每个分区背后的理由
+   - 结合边界值分析进行稳健测试
+   - 与利益相关者审查分区以确保完整性
 
-2. **DON'T:**
-   - Create overlapping partitions
-   - Skip invalid partitions (error cases are important!)
-   - Forget implicit boundaries or constraints
-   - Use only one test case per partition without considering boundaries
-   - Ignore edge cases that don't fit neatly into partitions
+2. **DON'T ❌:**
+   - 创建重叠的分区
+   - 跳过无效分区（错误情况很重要！）
+   - 忘记隐式边界或约束
+   - 每个分区只使用一个测试用例而不考虑边界
+   - 忽略不适合分区的边缘情况
 
-## Advanced Techniques
+## 高级技术
 
-### Output Equivalence Partitioning
-Test different output ranges, not just inputs.
+### 输出等价类划分
+测试不同的输出范围，而不仅仅是输入。
 
-**Example**: Grade calculation
+**示例**: 成绩计算
 ```
 Output partitions:
   - A: 90-100
@@ -263,10 +263,10 @@ Output partitions:
   - F: 0-59
 ```
 
-### Dependent Partitions
-When one input's valid partitions depend on another.
+### 依赖分区
+当一个输入的有效分区取决于另一个输入时。
 
-**Example**: Country and postal code
+**示例**: 国家和邮政编码
 ```
 Country: USA → Postal code: 5 digits or ZIP+4
 Country: Canada → Postal code: A1A 1A1 format

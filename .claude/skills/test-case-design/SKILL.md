@@ -1,62 +1,62 @@
 ---
 name: test-case-design
-description: Design detailed test cases using industry-standard techniques. Use when converting test plans into actionable test cases, ensuring comprehensive coverage through boundary analysis and equivalence partitioning.
+description: 使用行业标准技术设计详细的测试用例。用于将测试计划转换为可执行的测试用例，通过边界分析和等价类划分确保全面覆盖。
 ---
 
-# Test Case Design Skill
+# 测试用例设计技能 (Test Case Design Skill)
 
-When designing test cases:
+当设计测试用例时：
 
-1. **Apply Test Design Techniques**
+1. **应用测试设计技术**
 
-   **Equivalence Partitioning:**
-   - Divide input data into valid and invalid partitions
-   - Select one representative value from each partition
-   - Test both valid and invalid scenarios
+   **等价类划分 (Equivalence Partitioning):**
+   - 将输入数据分为有效和无效分区
+   - 从每个分区选择一个代表值
+   - 测试有效和无效场景
 
-   **Boundary Value Analysis:**
-   - Test at boundaries (min, min-1, min+1, max, max+1)
-   - Test edges of arrays, string lengths, numeric ranges
-   - Identify off-by-one errors
+   **边界值分析 (Boundary Value Analysis):**
+   - 在边界处进行测试 (min, min-1, min+1, max, max+1)
+   - 测试数组边缘、字符串长度、数字范围
+   - 识别差一错误 (off-by-one errors)
 
-   **Decision Tables:**
-   - Use for complex business logic with multiple conditions
-   - Cover all combinations of inputs and expected outputs
-   - Handle rule-based systems
+   **决策表 (Decision Tables):**
+   - 用于具有多个条件的复杂业务逻辑
+   - 覆盖所有输入和预期输出的组合
+   - 处理基于规则的系统
 
-   **State Transition:**
-   - Test system states and valid transitions
-   - Cover all valid and invalid transitions
-   - Test entry and exit conditions
+   **状态转换 (State Transition):**
+   - 测试系统状态和有效转换
+   - 覆盖所有有效和无效转换
+   - 测试进入和退出条件
 
-2. **Test Case Structure**
-   Each test case should include:
-   - **Unique ID**: TC001, TC002, etc.
-   - **Title**: Clear, concise description
-   - **Description**: What is being tested and why
-   - **Preconditions**: Required state before testing
-   - **Test Data**: Specific data values needed
-   - **Test Steps**: Detailed, step-by-step instructions
-   - **Expected Result**: What should happen
+2. **测试用例结构**
+   每个测试用例应包括：
+   - **Unique ID**: TC001, TC002 等
+   - **Title**: 清晰、简洁的描述
+   - **Description**: 正在测试什么以及为什么
+   - **Preconditions**: 测试前所需的状态
+   - **Test Data**: 需要的具体数据值
+   - **Test Steps**: 详细的、循序渐进的说明
+   - **Expected Result**: 应该发生什么
    - **Priority**: P0 (Critical), P1 (High), P2 (Medium), P3 (Low)
-   - **Test Type**: Functional, UI, API, Performance, Security, etc.
+   - **Test Type**: Functional, UI, API, Performance, Security 等
 
-3. **Ensure Coverage**
-   - **Positive Testing**: Valid inputs, happy path
-   - **Negative Testing**: Invalid inputs, error handling
-   - **Boundary Testing**: Edge cases and limits
-   - **Integration Testing**: Component interactions
-   - **End-to-End Testing**: Complete user workflows
+3. **确保覆盖率**
+   - **Positive Testing**: 有效输入，快乐路径
+   - **Negative Testing**: 无效输入，错误处理
+   - **Boundary Testing**: 边缘情况和限制
+   - **Integration Testing**: 组件交互
+   - **End-to-End Testing**: 完整的用户工作流
 
-4. **Write Clear Steps**
-   - Be specific and actionable
-   - Use simple language
-   - Include exact values (not "enter a valid name" → "enter 'John Doe'")
-   - Number each step sequentially
-   - One action per step
-   - Include verification points
+4. **编写清晰的步骤**
+   - 具体且可操作
+   - 使用简单的语言
+   - 包含确切值（不是"输入有效名称" → "输入 'John Doe'"）
+   - 按顺序编号每个步骤
+   - 每步一个动作
+   - 包含验证点
 
-5. **Output Format**
+5. **输出格式**
    ```json
    {
      "test_cases": [
@@ -84,11 +84,11 @@ When designing test cases:
    }
    ```
 
-**Best Practices:**
-- Each test case should verify one thing
-- Keep test cases independent of each other
-- Include both positive and negative scenarios
-- Use consistent naming conventions
-- Make steps reusable where possible
-- Consider maintenance and updates
-- Link test cases to requirements for traceability
+**最佳实践:**
+- 每个测试用例应该验证一件事
+- 保持测试用例相互独立
+- 包含正向和负向场景
+- 使用一致的命名约定
+- 在可能的情况下使步骤可重用
+- 考虑维护和更新
+- 将测试用例链接到需求以实现可追溯性

@@ -1,23 +1,23 @@
 ---
 name: cucumber-bdd
-description: Convert test cases into Gherkin syntax for BDD testing. Use when creating executable test specifications, bridging the gap between requirements and automated tests.
+description: 将测试用例转换为 Gherkin 语法以进行 BDD 测试。用于创建可执行的测试规范，弥合需求与自动化测试之间的差距。
 ---
 
-# Cucumber/BDD Skill
+# Cucumber/BDD 技能 (Cucumber/BDD Skill)
 
-Behavior-Driven Development (BDD) bridges the gap between business requirements and automated tests using Gherkin syntax.
+行为驱动开发 (BDD) 使用 Gherkin 语法弥合业务需求与自动化测试之间的差距。
 
-## When to Use
-- Converting test cases to executable specifications
-- Creating living documentation that serves as tests
-- Collaborating with non-technical stakeholders
-- Building automated test frameworks with Cucumber/SpecFlow
-- Ensuring tests reflect business requirements
+## 何时使用
+- 将测试用例转换为可执行规范
+- 创建作为测试的活文档
+- 与非技术利益相关者协作
+- 使用 Cucumber/SpecFlow 构建自动化测试框架
+- 确保测试反映业务需求
 
-## Gherkin Syntax Structure
+## Gherkin 语法结构
 
 ### Feature
-Describes the feature being tested from a user's perspective.
+从用户角度描述正在测试的功能。
 
 ```gherkin
 Feature: User login
@@ -27,7 +27,7 @@ Feature: User login
 ```
 
 ### Scenario
-A specific test case or example.
+具体的测试用例或示例。
 
 ```gherkin
 Scenario: Successful login with valid credentials
@@ -39,7 +39,7 @@ Scenario: Successful login with valid credentials
 ```
 
 ### Background
-Defines steps that run before each scenario.
+定义在每个场景之前运行的步骤。
 
 ```gherkin
 Background:
@@ -48,7 +48,7 @@ Background:
 ```
 
 ### Scenario Outline
-Data-driven testing with Examples table.
+使用 Examples 表的数据驱动测试。
 
 ```gherkin
 Scenario Outline: Invalid login attempts
@@ -65,42 +65,42 @@ Scenario Outline: Invalid login attempts
     | testuser | wrong      | Invalid credentials    |
 ```
 
-## Gherkin Keywords
+## Gherkin 关键字
 
-| Keyword | Purpose | Usage |
+| 关键字 | 目的 | 用法 |
 |---------|---------|-------|
-| **Feature** | High-level description | Start of feature file |
-| **Scenario** | Specific test case | Concrete example |
-| **Given** | Precondition | Initial context |
-| **When** | Action | User interaction |
-| **Then** | Outcome | Expected result |
-| **And** | Additional step | Multiple Given/When/Then |
-| **But** | Contrast | Alternative outcome |
-| **Background** | Shared context | Runs before each scenario |
-| **Scenario Outline** | Template | Data-driven scenarios |
-| **Examples** | Data table | Input combinations |
+| **Feature** | 高层描述 | 特性文件的开始 |
+| **Scenario** | 具体测试用例 | 具体示例 |
+| **Given** | 前置条件 | 初始上下文 |
+| **When** | 动作 | 用户交互 |
+| **Then** | 结果 | 预期结果 |
+| **And** | 附加步骤 | 多个 Given/When/Then |
+| **But** | 对比 | 替代结果 |
+| **Background** | 共享上下文 | 在每个场景前运行 |
+| **Scenario Outline** | 模板 | 数据驱动场景 |
+| **Examples** | 数据表 | 输入组合 |
 
-## Writing Good Gherkin
+## 编写优秀的 Gherkin
 
-### 1. Use Business Language
-❌ Bad: "Click element with ID #login-button"
-✅ Good: "Click the login button"
+### 1. 使用业务语言
+❌ 坏: "点击 ID 为 #login-button 的元素"
+✅ 好: "点击登录按钮"
 
-### 2. Keep Scenarios Focused
-❌ Bad: 20-step scenario testing everything
-✅ Good: 3-5 steps testing one behavior
+### 2. 保持场景聚焦
+❌ 坏: 测试所有内容的 20 步场景
+✅ 好: 测试一个行为的 3-5 步场景
 
-### 3. Make Steps Declarative
-❌ Bad: "Click button, wait 2 seconds, check URL contains /home, verify text 'Welcome'"
-✅ Good: "User is redirected to home page"
+### 3. 使步骤声明式
+❌ 坏: "点击按钮，等待 2 秒，检查 URL 包含 /home，验证文本 'Welcome'"
+✅ 好: "用户被重定向到主页"
 
-### 4. Use Scenario Outlines for Data
-❌ Bad: Writing 5 similar scenarios
-✅ Good: One Scenario Outline with Examples table
+### 4. 使用数据场景大纲
+❌ 坏: 编写 5 个类似的场景
+✅ 好: 一个带有 Examples 表的 Scenario Outline
 
-## Step Definition Patterns
+## 步骤定义模式
 
-### Given Steps (State)
+### Given 步骤 (状态)
 ```javascript
 // Single step
 Given('the user is on the login page', async function() {
@@ -121,7 +121,7 @@ Given('the following products exist:', async function(dataTable) {
 });
 ```
 
-### When Steps (Actions)
+### When 步骤 (动作)
 ```javascript
 // Simple action
 When('the user clicks the {string} button', async function(buttonText) {
@@ -137,7 +137,7 @@ When('the user enters username {string} and password {string}',
 );
 ```
 
-### Then Steps (Outcomes)
+### Then 步骤 (结果)
 ```javascript
 // Verification
 Then('a welcome message should be displayed', async function() {
@@ -152,7 +152,7 @@ Then('the error message {string} should be displayed', async function(expectedMs
 });
 ```
 
-## Complete Example
+## 完整示例
 
 ```gherkin
 Feature: User Authentication
@@ -191,28 +191,28 @@ Feature: User Authentication
       | user @example.com    |
 ```
 
-## Best Practices
+## 最佳实践
 
 ### DO ✅
-- Write scenarios from the user's perspective
-- Use Given-When-Then structure consistently
-- Keep scenarios short (3-8 steps)
-- Make scenarios independent of each other
-- Use meaningful, business-focused names
-- Include examples in Scenario Outlines
-- Write declarative steps (what, not how)
-- Keep background steps minimal
+- 从用户角度编写场景
+- 一致地使用 Given-When-Then 结构
+- 保持场景简短（3-8 步）
+- 使场景相互独立
+- 使用有意义的、以业务为中心的名称
+- 在 Scenario Outlines 中包含示例
+- 编写声明式步骤（做什么，而不是怎么做）
+- 保持背景步骤最小化
 
 ### DON'T ❌
-- Don't include implementation details
-- Don't write scenarios that depend on execution order
-- Don't mix multiple behaviors in one scenario
-- Don't use technical jargon
-- Don't write overly long scenarios
-- Don't duplicate similar scenarios (use Scenario Outline)
-- Don't include test data directly in steps (use tables)
+- 不要包含实现细节
+- 不要编写依赖执行顺序的场景
+- 不要在在一个场景中混合多种行为
+- 不要使用技术术语
+- 不要编写过长的场景
+- 不要重复类似的场景（使用 Scenario Outline）
+- 不要在步骤中直接包含测试数据（使用表格）
 
-## Integration with Playwright
+## 与 Playwright 集成
 
 ```gherkin
 Feature: E2E Testing with Playwright
@@ -230,7 +230,7 @@ Feature: E2E Testing with Playwright
     And a confirmation email should be sent
 ```
 
-Corresponding step definitions:
+对应的步骤定义：
 ```javascript
 const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
@@ -250,9 +250,9 @@ Then('the order should be placed successfully', async function() {
 });
 ```
 
-## Output Format
+## 输出格式
 
-When converting test cases to Gherkin:
+当将测试用例转换为 Gherkin 时：
 
 ```gherkin
 Feature: [Feature name from test case]
