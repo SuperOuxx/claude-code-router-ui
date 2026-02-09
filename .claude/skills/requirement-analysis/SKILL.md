@@ -1,6 +1,6 @@
 ---
 name: requirement-analysis
-description: 从文本描述中提取和构建需求。当用户提供需要分析和文档化的功能需求、用户故事或规范时使用。
+description: 从文本描述中提取和构建测试需求。当用户提供需要分析和文档化的功能需求、用户故事或规范时使用。
 ---
 
 # 需求分析技能 (Requirement Analysis Skill)

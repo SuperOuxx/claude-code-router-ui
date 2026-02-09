@@ -15,23 +15,9 @@ skills:
 3. 确保测试覆盖率和可追溯性
 4. 输出测试用例集合：
 
-```json
-{
-  "test_cases": [
-    {
-      "id": "TC001",
-      "title": "测试用例标题",
-      "description": "详细描述",
-      "preconditions": "前置条件",
-      "steps": [
-        {"step": 1, "action": "操作", "expected": "预期结果"}
-      ],
-      "test_data": "测试数据需求",
-      "priority": "高/中/低",
-      "type": "功能/界面/性能"
-    }
-  ]
-}
-```
+请以Markdown表格形式输出测试用例，包含以下列：
+| id | module | feature | description | preconditions | priority | steps | expected_result | actual_result | status | type |
+|---|---|---|---|---|---|---|---|---|---|---|
+| TC001 | 系统模块名称 | 系统模块下的功能名称 | 清晰的测试用例描述 | 前置条件 | P0 | 1. 操作步骤 | 预期结果 | 实际结果 | Pass | 功能 |
 
 <CCR-SUBAGENT-MODEL>ds,r1</CCR-SUBAGENT-MODEL>

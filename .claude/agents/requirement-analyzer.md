@@ -1,6 +1,6 @@
 ---
 name: requirement-analyzer
-description: 需求分析专家，用于从文本需求中提取核心功能和测试目标。
+description: 测试需求分析专家，用于从文本需求中提取核心功能和测试目标。
 model: ds,r1
 skills:
   - requirement-analysis

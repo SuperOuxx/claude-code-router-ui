@@ -31,15 +31,17 @@ description: 使用行业标准技术设计详细的测试用例。用于将测�
 
 2. **测试用例结构**
    每个测试用例应包括：
-   - **Unique ID**: TC001, TC002 等
-   - **Title**: 清晰、简洁的描述
-   - **Description**: 正在测试什么以及为什么
-   - **Preconditions**: 测试前所需的状态
-   - **Test Data**: 需要的具体数据值
-   - **Test Steps**: 详细的、循序渐进的说明
-   - **Expected Result**: 应该发生什么
-   - **Priority**: P0 (Critical), P1 (High), P2 (Medium), P3 (Low)
-   - **Test Type**: Functional, UI, API, Performance, Security 等
+   - **id**: TC001, TC002 等
+   - **module**: 系统模块名称
+   - **feature**: 系统模块下的功能名称
+   - **description**: 清晰的测试用例描述
+   - **preconditions**: 测试前所需的状态
+   - **priority**: P0 (Critical), P1 (High), P2 (Medium), P3 (Low)
+   - **steps**: 详细的、循序渐进的步骤说明
+   - **expected_result**: 应该发生什么
+   - **actual_result**: 实际结果
+   - **status**: pass/fail
+   - **type**: 功能/界面/性能 等
 
 3. **确保覆盖率**
    - **Positive Testing**: 有效输入，快乐路径
@@ -62,23 +64,16 @@ description: 使用行业标准技术设计详细的测试用例。用于将测�
      "test_cases": [
        {
          "id": "TC001",
-         "title": "User login with valid credentials",
-         "description": "Verify that a registered user can successfully login with correct username and password",
-         "preconditions": "User account exists with username 'testuser' and password 'Pass123!'",
-         "test_data": {
-           "username": "testuser",
-           "password": "Pass123!"
-         },
-         "steps": [
-           {"step": 1, "action": "Navigate to login page", "expected": "Login form is displayed"},
-           {"step": 2, "action": "Enter username 'testuser'", "expected": "Username is displayed in input field"},
-           {"step": 3, "action": "Enter password 'Pass123!'", "expected": "Password is masked"},
-           {"step": 4, "action": "Click Login button", "expected": "User is redirected to dashboard"},
-           {"step": 5, "action": "Verify login success", "expected": "Welcome message is displayed"}
-         ],
-         "expected_result": "User successfully logs in and lands on dashboard page",
+         "module": "认证",
+         "feature": "登录",
+         "description": "验证用户使用有效凭据登录",
+         "preconditions": "用户账号存在",
          "priority": "P0",
-         "type": "Functional"
+         "steps": "1. 导航到登录页面\n2. 输入有效用户名\n3. 输入有效密码\n4. 点击登录按钮",
+         "expected_result": "用户被重定向到仪表盘",
+         "actual_result": "",
+         "status": "Pass",
+         "type": "功能"
        }
      ]
    }

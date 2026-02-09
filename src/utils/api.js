@@ -45,7 +45,7 @@ export const api = {
   // Protected endpoints
   // config endpoint removed - no longer needed (frontend uses window.location)
   projects: () => authenticatedFetch('/api/projects'),
-  sessions: (projectName, limit = 5, offset = 0) => 
+  sessions: (projectName, limit = 5, offset = 0) =>
     authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/sessions?limit=${limit}&offset=${offset}`),
   sessionMessages: (projectName, sessionId, limit = null, offset = 0, provider = 'claude') => {
     const params = new URLSearchParams();
@@ -138,22 +138,39 @@ export const api = {
       body: formData,
       headers: {}, // Let browser set Content-Type for FormData
     }),
+  uploadFile: (projectName, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/files/upload`, {
+      method: 'POST',
+      body: formData,
+      headers: {}, // Let browser set Content-Type for FormData
+    });
+  },
+  initializeUploadsDirectory: (projectName) => {
+    return authenticatedFetch(`/api/projects/${encodeURIComponent(projectName)}/files/init`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  },
 
   // TaskMaster endpoints
   taskmaster: {
     // Initialize TaskMaster in a project
-    init: (projectName) => 
+    init: (projectName) =>
       authenticatedFetch(`/api/taskmaster/init/${projectName}`, {
         method: 'POST',
       }),
-    
+
     // Add a new task
     addTask: (projectName, { prompt, title, description, priority, dependencies }) =>
       authenticatedFetch(`/api/taskmaster/add-task/${projectName}`, {
         method: 'POST',
         body: JSON.stringify({ prompt, title, description, priority, dependencies }),
       }),
-    
+
     // Parse PRD to generate tasks
     parsePRD: (projectName, { fileName, numTasks, append }) =>
       authenticatedFetch(`/api/taskmaster/parse-prd/${projectName}`, {
@@ -179,7 +196,7 @@ export const api = {
         body: JSON.stringify(updates),
       }),
   },
-  
+
   // Browse filesystem for project suggestions
   browseFilesystem: (dirPath = null) => {
     const params = new URLSearchParams();

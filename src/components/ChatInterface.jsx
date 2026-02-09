@@ -1802,22 +1802,70 @@ const MessageComponent = memo(({ message, index, prevMessage, createDiff, onFile
   );
 });
 
-// ImageAttachment component for displaying image previews
-const ImageAttachment = ({ file, onRemove, uploadProgress, error }) => {
+const isImageAttachment = (file) => {
+  if (!file) return false;
+  if (file.type && file.type.startsWith('image/')) return true;
+  const fileName = file.name || '';
+  return /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(fileName);
+};
+
+const getFileExtension = (fileName = '') => {
+  const lastDot = fileName.lastIndexOf('.');
+  if (lastDot === -1 || lastDot === fileName.length - 1) return 'FILE';
+  return fileName.slice(lastDot + 1).toUpperCase();
+};
+
+const getNonImageFileIconClasses = (extension) => {
+  switch (extension) {
+    case 'PDF':
+      return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-300';
+    case 'DOC':
+    case 'DOCX':
+      return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300';
+    case 'XLS':
+    case 'XLSX':
+      return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300';
+    case 'ZIP':
+    case 'RAR':
+    case '7Z':
+      return 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300';
+    default:
+      return 'bg-gray-100 text-gray-600 dark:bg-gray-600/40 dark:text-gray-200';
+  }
+};
+
+// Attachment preview component: image thumbnail for images, filename for non-images
+const AttachmentPreview = ({ file, onRemove, error }) => {
   const [preview, setPreview] = useState(null);
+  const extension = getFileExtension(file?.name);
+  const iconClasses = getNonImageFileIconClasses(extension);
 
   useEffect(() => {
+    if (!isImageAttachment(file)) {
+      setPreview(null);
+      return;
+    }
     const url = URL.createObjectURL(file);
     setPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
   return (
-    <div className="relative group">
-      <img src={preview} alt={file.name} className="w-20 h-20 object-cover rounded" />
-      {uploadProgress !== undefined && uploadProgress < 100 && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-          <div className="text-white text-xs">{uploadProgress}%</div>
+    <div className="relative group min-w-[80px]">
+      {preview ? (
+        <img src={preview} alt={file.name} className="w-20 h-20 object-cover rounded" />
+      ) : (
+        <div className="w-48 h-20 px-3 rounded bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${iconClasses}`}>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 3h7l5 5v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 3v5h5" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-gray-700 dark:text-gray-200 truncate">{file.name}</div>
+            <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">{extension}</div>
+          </div>
         </div>
       )}
       {error && (
@@ -1879,9 +1927,8 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
   // These are not persisted and do not survive a page refresh; introduced so
   // the UI can present pending approvals while the SDK waits.
   const [pendingPermissionRequests, setPendingPermissionRequests] = useState([]);
-  const [attachedImages, setAttachedImages] = useState([]);
-  const [uploadingImages, setUploadingImages] = useState(new Map());
-  const [imageErrors, setImageErrors] = useState(new Map());
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const [attachmentErrors, setAttachmentErrors] = useState(new Map());
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const inputContainerRef = useRef(null);
@@ -1940,6 +1987,12 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
 
+  // File upload state
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const fileInputRef = useRef(null);
+
+
+
   // Track provider transitions so we only clear approvals when provider truly changes.
   // This does not sync with the backend; it just prevents UI prompts from disappearing.
   const lastProviderRef = useRef(provider);
@@ -1951,6 +2004,17 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
     }
     streamBufferRef.current = '';
   }, []);
+
+  const handleFileUpload = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      setAttachedFiles(prev => [...prev, ...files].slice(0, 10));
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  };
   // Load permission mode for the current session
   useEffect(() => {
     if (selectedSession?.id) {
@@ -4388,81 +4452,33 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
     setVisibleMessageCount(prevCount => prevCount + 100);
   }, []);
 
-  // Handle image files from drag & drop or file picker
-  const handleImageFiles = useCallback((files) => {
-    const validFiles = files.filter(file => {
-      try {
-        // Validate file object and properties
-        if (!file || typeof file !== 'object') {
-          console.warn('Invalid file object:', file);
-          return false;
-        }
-
-        if (!file.type || !file.type.startsWith('image/')) {
-          return false;
-        }
-
-        if (!file.size || file.size > 5 * 1024 * 1024) {
-          // Safely get file name with fallback
-          const fileName = file.name || 'Unknown file';
-          setImageErrors(prev => {
-            const newMap = new Map(prev);
-            newMap.set(fileName, 'File too large (max 5MB)');
-            return newMap;
-          });
-          return false;
-        }
-
-        return true;
-      } catch (error) {
-        console.error('Error validating file:', error, file);
-        return false;
-      }
-    });
-
+  // Handle files from drag & drop, file picker or clipboard
+  const handleAttachmentFiles = useCallback((files) => {
+    const validFiles = files.filter(file => file && typeof file === 'object' && file.name);
     if (validFiles.length > 0) {
-      setAttachedImages(prev => [...prev, ...validFiles].slice(0, 5)); // Max 5 images
+      setAttachedFiles(prev => [...prev, ...validFiles].slice(0, 10)); // Max 10 attachments
     }
   }, []);
 
-  // Handle clipboard paste for images
+  // Handle clipboard paste for attachments (including images)
   const handlePaste = useCallback(async (e) => {
-    const items = Array.from(e.clipboardData.items);
-
-    for (const item of items) {
-      if (item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        if (file) {
-          handleImageFiles([file]);
-        }
-      }
+    const files = Array.from(e.clipboardData?.files || []);
+    if (files.length > 0) {
+      handleAttachmentFiles(files);
     }
-
-    // Fallback for some browsers/platforms
-    if (items.length === 0 && e.clipboardData.files.length > 0) {
-      const files = Array.from(e.clipboardData.files);
-      const imageFiles = files.filter(f => f.type.startsWith('image/'));
-      if (imageFiles.length > 0) {
-        handleImageFiles(imageFiles);
-      }
-    }
-  }, [handleImageFiles]);
+  }, [handleAttachmentFiles]);
 
   // Setup dropzone
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']
-    },
-    maxSize: 5 * 1024 * 1024, // 5MB
-    maxFiles: 5,
-    onDrop: handleImageFiles,
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    maxFiles: 10,
+    onDrop: handleAttachmentFiles,
     noClick: true, // We'll use our own button
     noKeyboard: true
   });
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    if (!input.trim() || isLoading || !selectedProject) return;
+    if ((!input.trim() && attachedFiles.length === 0) || isLoading || !selectedProject) return;
 
     // Apply thinking mode prefix if selected
     let messageContent = input;
@@ -4471,42 +4487,49 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
       messageContent = `${selectedThinkingMode.prefix}: ${input}`;
     }
 
-    // Upload images first if any
-    let uploadedImages = [];
-    if (attachedImages.length > 0) {
-      const formData = new FormData();
-      attachedImages.forEach(file => {
-        formData.append('images', file);
-      });
-
+    // Upload attachments first, then append their @references to the message
+    const uploadedReferences = [];
+    if (attachedFiles.length > 0) {
+      setIsUploadingFile(true);
       try {
-        const response = await authenticatedFetch(`/api/projects/${selectedProject.name}/upload-images`, {
-          method: 'POST',
-          headers: {}, // Let browser set Content-Type for FormData
-          body: formData
-        });
+        for (const file of attachedFiles) {
+          const response = await api.uploadFile(selectedProject.name, file);
+          if (!response.ok) {
+            throw new Error(`Failed to upload ${file.name}`);
+          }
 
-        if (!response.ok) {
-          throw new Error('Failed to upload images');
+          const result = await response.json();
+          if (!result.success || !result.reference) {
+            throw new Error(result.error || `Failed to upload ${file.name}`);
+          }
+
+          const reference = result.reference.startsWith('@') ? result.reference : `@${result.reference}`;
+          uploadedReferences.push(reference);
         }
-
-        const result = await response.json();
-        uploadedImages = result.images;
       } catch (error) {
-        console.error('Image upload failed:', error);
+        console.error('Attachment upload failed:', error);
         setChatMessages(prev => [...prev, {
           type: 'error',
-          content: `Failed to upload images: ${error.message}`,
+          content: `Failed to upload attachments: ${error.message}`,
           timestamp: new Date()
         }]);
+        setIsUploadingFile(false);
         return;
       }
+      setIsUploadingFile(false);
+    }
+
+    if (uploadedReferences.length > 0) {
+      setFileMentions(prev => Array.from(new Set([...prev, ...uploadedReferences])));
+      const referencesText = uploadedReferences.join(' ');
+      messageContent = messageContent.trim()
+        ? `${messageContent}\n${referencesText}`
+        : referencesText;
     }
 
     const userMessage = {
       type: 'user',
-      content: input,
-      images: uploadedImages,
+      content: messageContent,
       timestamp: new Date()
     };
 
@@ -4618,8 +4641,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
           resume: !!currentSessionId,
           toolsSettings: toolsSettings,
           permissionMode: permissionMode,
-          model: claudeModel,
-          images: uploadedImages // Pass images to backend
+          model: claudeModel
         }
       });
     } else {
@@ -4634,17 +4656,15 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
           sessionId: currentSessionId,
           resume: !!currentSessionId,
           toolsSettings: toolsSettings,
-          permissionMode: permissionMode,
+          permissionMode: permissionMode
           // model parameter omitted for CCR
-          images: uploadedImages // Pass images to backend
         }
       });
     }
 
     setInput('');
-    setAttachedImages([]);
-    setUploadingImages(new Map());
-    setImageErrors(new Map());
+    setAttachedFiles([]);
+    setAttachmentErrors(new Map());
     setIsTextareaExpanded(false);
     setThinkingMode('none'); // Reset thinking mode after sending
 
@@ -4657,7 +4677,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
     if (selectedProject) {
       safeLocalStorage.removeItem(`draft_input_${selectedProject.name}`);
     }
-  }, [input, isLoading, selectedProject, attachedImages, currentSessionId, selectedSession, provider, permissionMode, onSessionActive, cursorModel, claudeModel, codexModel, sendMessage, setInput, setAttachedImages, setUploadingImages, setImageErrors, setIsTextareaExpanded, textareaRef, setChatMessages, setIsLoading, setCanAbortSession, setClaudeStatus, setIsUserScrolledUp, scrollToBottom, thinkingMode]);
+  }, [input, isLoading, selectedProject, attachedFiles, currentSessionId, selectedSession, provider, permissionMode, onSessionActive, cursorModel, claudeModel, codexModel, sendMessage, setInput, setAttachedFiles, setAttachmentErrors, setIsTextareaExpanded, textareaRef, setChatMessages, setIsLoading, setCanAbortSession, setClaudeStatus, setIsUserScrolledUp, scrollToBottom, thinkingMode]);
 
   const handleGrantToolPermission = useCallback((suggestion) => {
     if (!suggestion || (provider !== 'claude' && provider !== 'claude-official')) {
@@ -4848,8 +4868,9 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
     const spaceIndex = textAfterAtQuery.indexOf(' ');
     const textAfterQuery = spaceIndex !== -1 ? textAfterAtQuery.slice(spaceIndex) : '';
 
-    const newInput = textBeforeAt + file.path + ' ' + textAfterQuery;
-    const newCursorPos = textBeforeAt.length + file.path.length + 1;
+    const fileReference = `@${file.path}`;
+    const newInput = textBeforeAt + fileReference + ' ' + textAfterQuery;
+    const newCursorPos = textBeforeAt.length + fileReference.length + 1;
 
     // Immediately ensure focus is maintained
     if (textareaRef.current && !textareaRef.current.matches(':focus')) {
@@ -4859,7 +4880,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
     // Update input and cursor position
     setInput(newInput);
     setCursorPosition(newCursorPos);
-    setFileMentions(prev => (prev.includes(file.path) ? prev : [...prev, file.path]));
+    setFileMentions(prev => (prev.includes(fileReference) ? prev : [...prev, fileReference]));
 
     // Hide dropdown
     setShowFileDropdown(false);
@@ -5537,24 +5558,23 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                   <svg className="w-8 h-8 text-blue-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  <p className="text-sm font-medium">Drop images here</p>
+                  <p className="text-sm font-medium">Drop files here</p>
                 </div>
               </div>
             )}
 
-            {/* Image attachments preview */}
-            {attachedImages.length > 0 && (
+            {/* Attachments preview */}
+            {attachedFiles.length > 0 && (
               <div className="mb-2 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
                 <div className="flex flex-wrap gap-2">
-                  {attachedImages.map((file, index) => (
-                    <ImageAttachment
+                  {attachedFiles.map((file, index) => (
+                    <AttachmentPreview
                       key={index}
                       file={file}
                       onRemove={() => {
-                        setAttachedImages(prev => prev.filter((_, i) => i !== index));
+                        setAttachedFiles(prev => prev.filter((_, i) => i !== index));
                       }}
-                      uploadProgress={uploadingImages.get(file.name)}
-                      error={imageErrors.get(file.name)}
+                      error={attachmentErrors.get(file.name)}
                     />
                   ))}
                 </div>
@@ -5681,16 +5701,29 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                   className="chat-input-placeholder block w-full pl-12 pr-20 sm:pr-40 py-1.5 sm:py-4 bg-transparent rounded-2xl focus:outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-50 resize-none min-h-[50px] sm:min-h-[80px] max-h-[40vh] sm:max-h-[300px] overflow-y-auto text-base leading-6 transition-all duration-200"
                   style={{ height: '50px' }}
                 />
-                {/* Image upload button */}
+
+                {/* File Upload Button */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  multiple
+                  className="hidden"
+                />
                 <button
                   type="button"
-                  onClick={open}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingFile || isLoading}
                   className="absolute left-2 top-1/2 transform -translate-y-1/2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  title={t('input.attachImages')}
+                  title="Upload file"
                 >
-                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+                  {isUploadingFile ? (
+                    <div className="w-5 h-5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                  )}
                 </button>
 
                 {/* Mic button - HIDDEN */}
