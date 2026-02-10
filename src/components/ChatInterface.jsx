@@ -1987,6 +1987,10 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState(null);
 
+  // Skills state (for Codex provider)
+  const [skills, setSkills] = useState([]);
+  const [selectedSkill, setSelectedSkill] = useState(null);
+
   // File upload state
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const fileInputRef = useRef(null);
@@ -2157,6 +2161,49 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
       setSelectedAgent(null);
     }
   }, [selectedAgent]);
+
+  // Fetch skills for Codex / Claude / CCR providers
+  useEffect(() => {
+    const skillProviders = ['codex', 'claude', 'claude-official'];
+    if (!skillProviders.includes(provider)) {
+      setSkills([]);
+      return;
+    }
+
+    const fetchSkills = async () => {
+      try {
+        const projectPath = selectedProject?.path || '';
+        const response = await authenticatedFetch(`/api/skills?projectPath=${encodeURIComponent(projectPath)}&provider=${encodeURIComponent(provider)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSkills(data.skills || []);
+        }
+      } catch (error) {
+        console.error('Error fetching skills:', error);
+      }
+    };
+
+    fetchSkills();
+  }, [provider, selectedProject]);
+
+  // Handle skill selection - insert skill prefix at the beginning of input
+  // Claude/CCR uses /skill-name, Codex uses $skill-name
+  useEffect(() => {
+    if (selectedSkill) {
+      const isClaudeProvider = provider === 'claude' || provider === 'claude-official';
+      const skillMention = isClaudeProvider
+        ? `/${selectedSkill} `
+        : `$${selectedSkill} `;
+      setInput(prev => {
+        // Remove any existing skill mention at the beginning (both /xxx and $xxx patterns)
+        const cleaned = prev.replace(/^[/$]\S+\s*/, '');
+        // Prepend the new skill mention
+        return skillMention + cleaned;
+      });
+      // Clear the selection after inserting
+      setSelectedSkill(null);
+    }
+  }, [selectedSkill, provider]);
 
   // Create Fuse instance for fuzzy search
   const fuse = useMemo(() => {
@@ -5656,6 +5703,56 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                   {agents.map((agent) => (
                     <option key={agent.name} value={agent.name}>
                       {agent.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Skills Selector (Codex / Claude / CCR) */}
+                {['codex', 'claude', 'claude-official'].includes(provider) && skills.length > 0 && (
+                  <>
+                    <label htmlFor="skill-select" className="text-xs text-gray-500 dark:text-gray-400 ml-2">Skills:</label>
+                    <select
+                      id="skill-select"
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setSelectedSkill(e.target.value);
+                          e.target.value = ''; // Reset after selection
+                        }
+                      }}
+                      className="px-3 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-500 cursor-pointer"
+                    >
+                      <option value="">Select a skill...</option>
+                      {skills.map((skill) => (
+                        <option key={skill.name} value={skill.name}>
+                          {skill.name}{skill.source === 'global' ? ' (global)' : ' (project)'}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Skills Selector standalone (when no agents but supported provider with skills) */}
+            {agents.length === 0 && ['codex', 'claude', 'claude-official'].includes(provider) && skills.length > 0 && (
+              <div className="mb-2 flex items-center gap-2">
+                <label htmlFor="skill-select-standalone" className="text-xs text-gray-500 dark:text-gray-400">Skills:</label>
+                <select
+                  id="skill-select-standalone"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSelectedSkill(e.target.value);
+                      e.target.value = ''; // Reset after selection
+                    }
+                  }}
+                  className="px-3 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-500 cursor-pointer"
+                >
+                  <option value="">Select a skill...</option>
+                  {skills.map((skill) => (
+                    <option key={skill.name} value={skill.name}>
+                      {skill.name}{skill.source === 'global' ? ' (global)' : ' (project)'}
                     </option>
                   ))}
                 </select>

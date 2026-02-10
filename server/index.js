@@ -62,6 +62,7 @@ import commandsRoutes from './routes/commands.js';
 import settingsRoutes from './routes/settings.js';
 import agentRoutes from './routes/agent.js';
 import agentsRoutes from './routes/agents.js';
+import skillsRoutes from './routes/skills.js';
 import projectsRoutes from './routes/projects.js';
 import cliAuthRoutes from './routes/cli-auth.js';
 import userRoutes from './routes/user.js';
@@ -292,6 +293,9 @@ app.use('/api/agent', agentRoutes);
 
 // Agents List API Routes (protected)
 app.use('/api/agents', authenticateToken, agentsRoutes);
+
+// Skills List API Routes (protected)
+app.use('/api/skills', authenticateToken, skillsRoutes);
 
 // Serve public files (like api-docs.html)
 app.use(express.static(path.join(__dirname, '../public')));
