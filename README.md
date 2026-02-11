@@ -58,6 +58,16 @@ A desktop and mobile UI for [Claude Code](https://docs.anthropic.com/en/docs/cla
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v20 or higher
+
+### Windows (Auto-Start / Production)
+
+One-time setup that builds `dist/` and registers auto-start so you can reboot/login and just open the URL:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\windows\\Deploy.ps1 -Action deploy -Port 3001
+```
+
+Docs: `docs/windows-deploy.md`
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and configured, and/or
 - [Cursor CLI](https://docs.cursor.com/en/cli/overview) installed and configured, and/or
 - [Codex](https://developers.openai.com/codex) installed and configured

@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Code UI - API Documentation</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    
+
     <!-- Prism.js for syntax highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-    
+
     <style>
         * {
             margin: 0;
@@ -389,7 +390,7 @@
             .main-layout {
                 flex-direction: column;
             }
-            
+
             .sidebar {
                 width: 100%;
                 position: relative;
@@ -397,7 +398,7 @@
                 border-right: none;
                 border-bottom: 1px solid var(--gray-200);
             }
-            
+
             .docs-section {
                 padding: 2rem 1.5rem;
             }
@@ -408,23 +409,26 @@
         }
     </style>
 </head>
+
 <body>
     <header>
         <div class="header-content">
             <div class="brand">
                 <div class="brand-icon">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                     </svg>
                 </div>
                 <div class="brand-text">
-                    <h1>Claude Code UI</h1>
+                    <h1>Claude Code Router UI</h1>
                     <div class="subtitle">API Documentation</div>
                 </div>
             </div>
             <a href="/" class="back-link">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
                 Back to App
             </a>
@@ -449,12 +453,15 @@
             <div class="section-row">
                 <div class="docs-section">
                     <div class="intro">
-                        <p><strong>Programmatically trigger AI agents to work on projects.</strong> Clone GitHub repositories or use existing project paths. Perfect for CI/CD pipelines, automated code reviews, and bulk processing.</p>
+                        <p><strong>Programmatically trigger AI agents to work on projects.</strong> Clone GitHub
+                            repositories or use existing project paths. Perfect for CI/CD pipelines, automated code
+                            reviews, and bulk processing.</p>
                     </div>
 
                     <section id="authentication">
                         <h2>Authentication</h2>
-                        <p>All API requests require authentication using an API key in the <code>X-API-Key</code> header.</p>
+                        <p>All API requests require authentication using an API key in the <code>X-API-Key</code>
+                            header.</p>
 
                         <p>Generate API keys in Settings → API & Tokens.</p>
                     </section>
@@ -486,7 +493,8 @@
                         <div class="endpoint">
                             <div class="endpoint-header">
                                 <span class="method method-post">POST</span>
-                                <span class="endpoint-path"><span class="api-url">http://localhost:3001</span>/api/agent</span>
+                                <span class="endpoint-path"><span
+                                        class="api-url">http://localhost:3001</span>/api/agent</span>
                             </div>
 
                             <p>Trigger an AI agent (Claude, Cursor, or Codex) to work on a project.</p>
@@ -506,13 +514,17 @@
                                         <td><code>githubUrl</code></td>
                                         <td>string</td>
                                         <td><span class="badge badge-optional">Conditional</span></td>
-                                        <td>GitHub repository URL to clone. If path exists with same repo, reuses it. If path exists with different repo, returns error.</td>
+                                        <td>GitHub repository URL to clone. If path exists with same repo, reuses it. If
+                                            path exists with different repo, returns error.</td>
                                     </tr>
                                     <tr>
                                         <td><code>projectPath</code></td>
                                         <td>string</td>
                                         <td><span class="badge badge-optional">Conditional</span></td>
-                                        <td>Path to existing project OR destination for cloning. If omitted with <code>githubUrl</code>, auto-generates path. If used alone, must point to existing project directory.</td>
+                                        <td>Path to existing project OR destination for cloning. If omitted with
+                                            <code>githubUrl</code>, auto-generates path. If used alone, must point to
+                                            existing project directory.
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td><code>message</code></td>
@@ -524,7 +536,9 @@
                                         <td><code>provider</code></td>
                                         <td>string</td>
                                         <td><span class="badge badge-optional">Optional</span></td>
-                                        <td><code>claude</code>, <code>cursor</code>, or <code>codex</code> (default: <code>claude</code>)</td>
+                                        <td><code>claude</code>, <code>cursor</code>, or <code>codex</code> (default:
+                                            <code>claude</code>)
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td><code>stream</code></td>
@@ -544,7 +558,10 @@
                                         <td><code>cleanup</code></td>
                                         <td>boolean</td>
                                         <td><span class="badge badge-optional">Optional</span></td>
-                                        <td>Auto-cleanup after completion (default: <code>true</code>). Only applies when cloning via <code>githubUrl</code>. Existing projects specified via <code>projectPath</code> are never cleaned up.</td>
+                                        <td>Auto-cleanup after completion (default: <code>true</code>). Only applies
+                                            when cloning via <code>githubUrl</code>. Existing projects specified via
+                                            <code>projectPath</code> are never cleaned up.
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td><code>githubToken</code></td>
@@ -556,36 +573,55 @@
                                         <td><code>branchName</code></td>
                                         <td>string</td>
                                         <td><span class="badge badge-optional">Optional</span></td>
-                                        <td>Custom branch name to use. If provided, <code>createBranch</code> is automatically enabled. Branch names are validated against Git naming rules. Works with <code>githubUrl</code> or <code>projectPath</code> (if it has a GitHub remote).</td>
+                                        <td>Custom branch name to use. If provided, <code>createBranch</code> is
+                                            automatically enabled. Branch names are validated against Git naming rules.
+                                            Works with <code>githubUrl</code> or <code>projectPath</code> (if it has a
+                                            GitHub remote).</td>
                                     </tr>
                                     <tr>
                                         <td><code>createBranch</code></td>
                                         <td>boolean</td>
                                         <td><span class="badge badge-optional">Optional</span></td>
-                                        <td>Create a new branch after successful completion (default: <code>false</code>). Automatically set to <code>true</code> if <code>branchName</code> is provided. Works with <code>githubUrl</code> or <code>projectPath</code> (if it has a GitHub remote).</td>
+                                        <td>Create a new branch after successful completion (default:
+                                            <code>false</code>). Automatically set to <code>true</code> if
+                                            <code>branchName</code> is provided. Works with <code>githubUrl</code> or
+                                            <code>projectPath</code> (if it has a GitHub remote).
+                                        </td>
                                     </tr>
                                     <tr>
                                         <td><code>createPR</code></td>
                                         <td>boolean</td>
                                         <td><span class="badge badge-optional">Optional</span></td>
-                                        <td>Create a pull request after successful completion (default: <code>false</code>). PR title and description auto-generated from commit messages. Works with <code>githubUrl</code> or <code>projectPath</code> (if it has a GitHub remote).</td>
+                                        <td>Create a pull request after successful completion (default:
+                                            <code>false</code>). PR title and description auto-generated from commit
+                                            messages. Works with <code>githubUrl</code> or <code>projectPath</code> (if
+                                            it has a GitHub remote).
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
 
                             <div class="note">
                                 <strong>Path Handling Behavior:</strong><br><br>
-                                <strong>Scenario 1:</strong> Only <code>githubUrl</code> → Clones to auto-generated temporary path<br>
-                                <strong>Scenario 2:</strong> Only <code>projectPath</code> → Uses existing project at specified path<br>
-                                <strong>Scenario 3:</strong> Both provided → Clones <code>githubUrl</code> to <code>projectPath</code><br><br>
-                                <strong>Validation:</strong> If <code>projectPath</code> exists and contains a git repository, the remote URL is compared with <code>githubUrl</code>. If URLs match, the existing repo is reused. If URLs differ, an error is returned.
+                                <strong>Scenario 1:</strong> Only <code>githubUrl</code> → Clones to auto-generated
+                                temporary path<br>
+                                <strong>Scenario 2:</strong> Only <code>projectPath</code> → Uses existing project at
+                                specified path<br>
+                                <strong>Scenario 3:</strong> Both provided → Clones <code>githubUrl</code> to
+                                <code>projectPath</code><br><br>
+                                <strong>Validation:</strong> If <code>projectPath</code> exists and contains a git
+                                repository, the remote URL is compared with <code>githubUrl</code>. If URLs match, the
+                                existing repo is reused. If URLs differ, an error is returned.
                             </div>
 
                             <h4>Response (Streaming)</h4>
-                            <p>Server-sent events (SSE) format with real-time updates. Content-Type: <code>text/event-stream</code></p>
+                            <p>Server-sent events (SSE) format with real-time updates. Content-Type:
+                                <code>text/event-stream</code>
+                            </p>
 
                             <h4>Response (Non-Streaming)</h4>
-                            <p>JSON object containing session details, assistant messages only (filtered), and token usage summary. Content-Type: <code>application/json</code></p>
+                            <p>JSON object containing session details, assistant messages only (filtered), and token
+                                usage summary. Content-Type: <code>application/json</code></p>
 
                             <h4>Error Response</h4>
                             <p>Returns error details with appropriate HTTP status code.</p>
@@ -603,7 +639,7 @@
                         </div>
 
                         <div class="tab-content active" id="curl-basic">
-<pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
+                            <pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ck_..." \
   -d '{
@@ -613,7 +649,7 @@
                         </div>
 
                         <div class="tab-content" id="js-basic">
-<pre><code class="language-javascript">const response = await fetch('<span class="api-url">http://localhost:3001</span>/api/agent', {
+                            <pre><code class="language-javascript">const response = await fetch('<span class="api-url">http://localhost:3001</span>/api/agent', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -630,7 +666,7 @@ const result = await response.json();</code></pre>
                         </div>
 
                         <div class="tab-content" id="python-basic">
-<pre><code class="language-python">import requests
+                            <pre><code class="language-python">import requests
 import os
 
 response = requests.post(
@@ -652,7 +688,7 @@ print(response.json())</code></pre>
 
                     <div class="example-block">
                         <h4>Streaming Response</h4>
-<pre><code class="language-javascript">data: {"type":"status","message":"Repository cloned"}
+                        <pre><code class="language-javascript">data: {"type":"status","message":"Repository cloned"}
 data: {"type":"thinking","content":"Analyzing..."}
 data: {"type":"tool_use","tool":"read_file"}
 data: {"type":"content","content":"Done!"}
@@ -661,7 +697,7 @@ data: {"type":"done"}</code></pre>
 
                     <div class="example-block">
                         <h4>Non-Streaming Response</h4>
-<pre><code class="language-json">{
+                        <pre><code class="language-json">{
   "success": true,
   "sessionId": "abc123",
   "messages": [
@@ -703,7 +739,7 @@ data: {"type":"done"}</code></pre>
 
                     <div class="example-block">
                         <h4>Error Response</h4>
-<pre><code class="language-json">{
+                        <pre><code class="language-json">{
   "success": false,
   "error": "Directory exists with different repo"
 }</code></pre>
@@ -730,14 +766,16 @@ data: {"type":"done"}</code></pre>
                         <p>Integrate with GitHub Actions or other CI/CD pipelines.</p>
 
                         <h3>Create Branch and Pull Request</h3>
-                        <p>Automatically create a new branch and pull request after the agent completes its work. Branch names are auto-generated from the message, and PR title/description are auto-generated from commit messages.</p>
+                        <p>Automatically create a new branch and pull request after the agent completes its work. Branch
+                            names are auto-generated from the message, and PR title/description are auto-generated from
+                            commit messages.</p>
                     </section>
                 </div>
 
                 <div class="examples-section">
                     <div class="example-block">
                         <h4>Use Existing Project</h4>
-<pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
+                        <pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ck_..." \
   -d '{
@@ -748,7 +786,7 @@ data: {"type":"done"}</code></pre>
 
                     <div class="example-block">
                         <h4>Clone to Custom Path</h4>
-<pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
+                        <pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ck_..." \
   -d '{
@@ -761,7 +799,7 @@ data: {"type":"done"}</code></pre>
 
                     <div class="example-block">
                         <h4>CI/CD (GitHub Actions)</h4>
-<pre><code class="language-yaml">- name: Trigger Agent
+                        <pre><code class="language-yaml">- name: Trigger Agent
   run: |
     curl -X POST ${{ secrets.API_URL }}/api/agent \
       -H "X-API-Key: ${{ secrets.API_KEY }}" \
@@ -775,7 +813,7 @@ data: {"type":"done"}</code></pre>
 
                     <div class="example-block">
                         <h4>Create Branch and PR</h4>
-<pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
+                        <pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ck_..." \
   -d '{
@@ -789,7 +827,7 @@ data: {"type":"done"}</code></pre>
 
                     <div class="example-block">
                         <h4>Custom Branch Name</h4>
-<pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
+                        <pre><code class="language-bash">curl -X POST <span class="api-url">http://localhost:3001</span>/api/agent \
   -H "Content-Type: application/json" \
   -H "X-API-Key: ck_..." \
   -d '{
@@ -803,7 +841,7 @@ data: {"type":"done"}</code></pre>
 
                     <div class="example-block">
                         <h4>Branch & PR Response</h4>
-<pre><code class="language-json">{
+                        <pre><code class="language-json">{
   "success": true,
   "branch": {
     "name": "feature/user-auth",
@@ -848,7 +886,7 @@ data: {"type":"done"}</code></pre>
         });
 
         // Tab switching
-        window.showTab = function(tabName) {
+        window.showTab = function (tabName) {
             const parentBlock = event.target.closest('.example-block');
             if (!parentBlock) return;
 
@@ -876,4 +914,5 @@ data: {"type":"done"}</code></pre>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-http.min.js"></script>
 </body>
+
 </html>

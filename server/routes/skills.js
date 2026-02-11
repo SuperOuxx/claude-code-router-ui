@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import os from 'os';
 import { promises as fs } from 'fs';
+import matter from 'gray-matter';
 
 const router = express.Router();
 
@@ -10,7 +11,7 @@ const router = express.Router();
  *
  * 获取所有可用的 skills 列表
  * 根据 provider 搜索不同目录：
- *   - codex: HOME/.codex/skills/ + {projectPath}/.codex/skills/
+ *   - codex: HOME/.agents/skills/ + HOME/.codex/skills/ + {projectPath}/.codex/skills/
  *   - claude / claude-official: HOME/.claude/skills/ + {projectPath}/.claude/skills/
  * 读取非隐藏文件夹名（只一层），返回 { skills: [{ name, source }] }
  */
@@ -35,12 +36,28 @@ router.get('/', async (req, res) => {
             const entries = await fs.readdir(dir, { withFileTypes: true });
             for (const entry of entries) {
                 if (entry.isDirectory() && !entry.name.startsWith('.')) {
-                    skillsMap.set(entry.name, { name: entry.name, source });
+                    let displayName = entry.name;
+                    // Try to read SKILL.md for chinese name
+                    try {
+                        const skillMdPath = path.join(dir, entry.name, 'SKILL.md');
+                        const content = await fs.readFile(skillMdPath, 'utf8');
+                        const parsed = matter(content);
+                        if (parsed.data && parsed.data.chinese) {
+                            displayName = parsed.data.chinese;
+                        }
+                    } catch (e) {
+                        // ignore error, use folder name
+                    }
+
+                    skillsMap.set(entry.name, { name: displayName, value: entry.name, source });
                 }
             }
         };
 
-        // 1. Read global skills: HOME/{configDir}/skills/
+        // 1. Read global skills: HOME/.agents/skills/ + HOME/{configDir}/skills/
+        const commonGlobalSkillsDir = path.join(os.homedir(), '.agents', 'skills');
+        await readSkillDirs(commonGlobalSkillsDir, 'global');
+
         const globalSkillsDir = path.join(os.homedir(), configDir, 'skills');
         await readSkillDirs(globalSkillsDir, 'global');
 
@@ -52,7 +69,7 @@ router.get('/', async (req, res) => {
 
         // Convert map to sorted array
         const skills = Array.from(skillsMap.values()).sort((a, b) =>
-            a.name.localeCompare(b.name)
+            a.name.localeCompare(b.name, 'zh-CN')
         );
 
         res.json({ skills });

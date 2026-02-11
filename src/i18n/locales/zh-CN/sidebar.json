@@ -20,8 +20,8 @@
     "runClaudeCli": "在项目目录中运行 Claude CLI 以开始使用"
   },
   "app": {
-    "title": "Claude Code UI",
-    "subtitle": "AI 编程助手"
+    "title": "Claude Code Router UI",
+    "subtitle": "AI 助手"
   },
   "sessions": {
     "title": "会话",

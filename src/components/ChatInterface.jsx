@@ -2134,7 +2134,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const response = await authenticatedFetch('/api/agents');
+        const response = await authenticatedFetch(`/api/agents?provider=${encodeURIComponent(provider)}`);
         if (response.ok) {
           const data = await response.json();
           setAgents(data.agents || []);
@@ -2145,7 +2145,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
     };
 
     fetchAgents();
-  }, []);
+  }, [provider]);
 
   // Handle agent selection - insert @"${selectedAgent} (agent)" at the beginning of input
   useEffect(() => {
@@ -5724,7 +5724,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                     >
                       <option value="">Select a skill...</option>
                       {skills.map((skill) => (
-                        <option key={skill.name} value={skill.name}>
+                        <option key={skill.value || skill.name} value={skill.value || skill.name}>
                           {skill.name}{skill.source === 'global' ? ' (global)' : ' (project)'}
                         </option>
                       ))}
@@ -5751,7 +5751,7 @@ function ChatInterface({ selectedProject, selectedSession, ws, sendMessage, mess
                 >
                   <option value="">Select a skill...</option>
                   {skills.map((skill) => (
-                    <option key={skill.name} value={skill.name}>
+                    <option key={skill.value || skill.name} value={skill.value || skill.name}>
                       {skill.name}{skill.source === 'global' ? ' (global)' : ' (project)'}
                     </option>
                   ))}

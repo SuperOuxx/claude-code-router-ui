@@ -12,7 +12,9 @@ const router = express.Router();
  */
 router.get('/', async (req, res) => {
   try {
-    const agentsDir = path.join(process.cwd(), '.claude', 'agents');
+    const { provider } = req.query;
+    const configDir = provider === 'codex' ? '.codex' : '.claude';
+    const agentsDir = path.join(process.cwd(), configDir, 'agents');
 
     // 确保目录存在
     try {
