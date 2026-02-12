@@ -4,6 +4,7 @@ import { LogIn, Settings as SettingsIcon } from 'lucide-react';
 import ClaudeLogo from '../ClaudeLogo';
 import CursorLogo from '../CursorLogo';
 import CodexLogo from '../CodexLogo';
+import GeminiLogo from '../GeminiLogo';
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { authenticatedFetch } from '../../utils/api';
@@ -39,11 +40,22 @@ const agentConfig = {
     subtextClass: 'text-gray-700 dark:text-gray-300',
     buttonClass: 'bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600',
   },
+  gemini: {
+    name: 'Gemini',
+    description: 'Google Gemini AI assistant',
+    Logo: GeminiLogo,
+    bgClass: 'bg-green-50 dark:bg-green-900/20',
+    borderClass: 'border-green-200 dark:border-green-800',
+    textClass: 'text-green-900 dark:text-green-100',
+    subtextClass: 'text-green-700 dark:text-green-300',
+    buttonClass: 'bg-green-600 hover:bg-green-700',
+  },
 };
 
-export default function AccountContent({ agent, authStatus, onLogin }) {
+export default function AccountContent({ agent, agentId, authStatus, onLogin }) {
   const { t } = useTranslation('settings');
-  const config = agentConfig[agent];
+  const currentAgent = agent ?? agentId ?? 'claude';
+  const config = agentConfig[currentAgent] ?? agentConfig.claude;
   const { Logo } = config;
 
   // CCR UI configuration state
@@ -83,7 +95,7 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
         <Logo className="w-6 h-6" />
         <div>
           <h3 className="text-lg font-medium text-foreground">{config.name}</h3>
-          <p className="text-sm text-muted-foreground">{t(`agents.account.${agent}.description`)}</p>
+          <p className="text-sm text-muted-foreground">{t(`agents.account.${currentAgent}.description`)}</p>
         </div>
       </div>
 
@@ -99,11 +111,11 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
                 {authStatus?.loading ? (
                   t('agents.authStatus.checkingAuth')
                 ) : authStatus?.authenticated ? (
-                  agent === 'claude'
+                  currentAgent === 'claude'
                     ? t('agents.authStatus.installedVersion', { email: authStatus.email || t('agents.authStatus.authenticatedUser') })
                     : t('agents.authStatus.loggedInAs', { email: authStatus.email || t('agents.authStatus.authenticatedUser') })
                 ) : (
-                  agent === 'claude' ? t('agents.authStatus.notInstalled') : t('agents.authStatus.notConnected')
+                  currentAgent === 'claude' ? t('agents.authStatus.notInstalled') : t('agents.authStatus.notConnected')
                 )}
               </div>
             </div>
@@ -114,11 +126,11 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
                 </Badge>
               ) : authStatus?.authenticated ? (
                 <Badge variant="success" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                  {agent === 'claude' ? t('agents.authStatus.installed') : t('agents.authStatus.connected')}
+                  {currentAgent === 'claude' ? t('agents.authStatus.installed') : t('agents.authStatus.connected')}
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
-                  {agent === 'claude' ? t('agents.authStatus.notInstalled') : t('agents.authStatus.disconnected')}
+                  {currentAgent === 'claude' ? t('agents.authStatus.notInstalled') : t('agents.authStatus.disconnected')}
                 </Badge>
               )}
             </div>
@@ -156,7 +168,7 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
           )}
 
           {/* CCR Configuration - Only for Claude */}
-          {agent === 'claude' && (
+          {currentAgent === 'claude' && (
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
               <div className="flex items-center justify-between">
                 <div>

@@ -56,3 +56,4 @@ Logs:
 
 - The auto-start task runs as your user, so `~/.claude` paths resolve correctly (running as `SYSTEM` would use a different home directory).
 - If you need LAN access from other machines, you must open Windows Firewall for the chosen `PORT`.
+- `scripts\\windows\\Deploy.ps1` pauses on errors by default (so the window doesn’t close immediately). Use `-NoPauseOnError` to disable.

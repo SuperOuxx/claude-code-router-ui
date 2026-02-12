@@ -33,6 +33,9 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [projectSortOrder, setProjectSortOrder] = useState('name');
+  const [workspacesRoot, setWorkspacesRoot] = useState('');
+  const [resolvedWorkspacesRoot, setResolvedWorkspacesRoot] = useState('');
+  const [workspacesRootLoading, setWorkspacesRootLoading] = useState(false);
 
   const [mcpServers, setMcpServers] = useState([]);
   const [showMcpForm, setShowMcpForm] = useState(false);
@@ -590,12 +593,61 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
 
       // Load Codex MCP servers
       await fetchCodexMcpServers();
+
+      // Load Server Config
+      loadServerConfig();
     } catch (error) {
       console.error('Error loading tool settings:', error);
       setAllowedTools([]);
       setDisallowedTools([]);
       setSkipPermissions(false);
       setProjectSortOrder('name');
+    }
+  };
+
+  const loadServerConfig = async () => {
+    try {
+      setWorkspacesRootLoading(true);
+      const response = await authenticatedFetch('/api/settings/config');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.config) {
+          setWorkspacesRoot(data.config.workspacesRoot || '');
+          setResolvedWorkspacesRoot(data.config.resolvedWorkspacesRoot || '');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading server config:', error);
+    } finally {
+      setWorkspacesRootLoading(false);
+    }
+  };
+
+  const saveWorkspacesRoot = async () => {
+    try {
+      setWorkspacesRootLoading(true);
+      const response = await authenticatedFetch('/api/settings/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspacesRoot })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.config) {
+          setWorkspacesRoot(data.config.workspacesRoot || '');
+          setResolvedWorkspacesRoot(data.config.resolvedWorkspacesRoot || '');
+          setSaveStatus('success');
+          setTimeout(() => setSaveStatus(null), 3000);
+        }
+      } else {
+        setSaveStatus('error');
+      }
+    } catch (error) {
+      console.error('Error saving workspaces root:', error);
+      setSaveStatus('error');
+    } finally {
+      setWorkspacesRootLoading(false);
     }
   };
 
@@ -720,8 +772,64 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         checkCursorAuthStatus();
       } else if (loginProvider === 'codex') {
         checkCodexAuthStatus();
+      } else if (loginProvider === 'gemini') {
+        checkGeminiAuthStatus();
       }
     }
+  };
+
+  const handleClaudeLogout = async () => {
+    // Currently no API to logout from CLI, so just clear state
+    // In a real implementation we would call an endpoint to runs `claude logout`
+    setClaudeAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const handleCursorLogout = async () => {
+    setCursorAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const handleCodexLogout = async () => {
+    setCodexAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const handleGeminiLogin = () => {
+    setLoginProvider('gemini');
+    setSelectedProject(projects?.[0] || { name: 'default', fullPath: process.cwd() });
+    setShowLoginModal(true);
+  };
+
+  const handleGeminiLogout = async () => {
+    setGeminiAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const checkGeminiAuthStatus = async () => {
+    // Placeholder for Gemini auth check
+    setGeminiAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
   };
 
   const saveSettings = () => {
@@ -973,7 +1081,17 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         <div className="flex-1 overflow-y-auto">
           {/* Tab Navigation */}
           <div className="border-b border-border">
-            <div className="flex px-4 md:px-6">
+            <div className="flex px-4 md:px-6 overflow-x-auto">
+              <button
+                onClick={() => setActiveTab('workspace')}
+                className={`px-3 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap inline-flex items-center gap-2 ${activeTab === 'workspace'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+              >
+                <FolderOpen className="w-4 h-4" />
+                <span>{t('account.workspaces.title') || 'Workspaces'}</span>
+              </button>
               <button
                 onClick={() => setActiveTab('agents')}
                 className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'agents'
@@ -1251,6 +1369,47 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
             {/* Git Tab */}
             {activeTab === 'git' && <GitSettings />}
 
+            {/* Workspace Tab */}
+            {activeTab === 'workspace' && (
+              <div className="space-y-6 md:space-y-8">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+                  <h3 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
+                    <FolderOpen className="w-5 h-5" />
+                    {t('account.workspaces.title') || 'Workspaces Configuration'}
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        {t('account.workspaces.rootLabel') || 'Workspaces Root Directory'}
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={workspacesRoot}
+                          onChange={(e) => setWorkspacesRoot(e.target.value)}
+                          placeholder={t('account.workspaces.rootPlaceholder') || 'e.g. ~/Projects or D:\\Projects'}
+                          className="flex-1"
+                        />
+                        <Button
+                          onClick={saveWorkspacesRoot}
+                          disabled={workspacesRootLoading}
+                          className="min-w-[80px]"
+                        >
+                          {workspacesRootLoading ? 'Saving...' : (t('common.save') || 'Save')}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {(t('account.workspaces.currentResolved') || 'Current resolved path:')} <span className="font-mono bg-gray-100 dark:bg-gray-900 px-1 rounded">{resolvedWorkspacesRoot || 'Loading...'}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('account.workspaces.description') || 'Directory where new projects will be created. Defaults to home directory if empty.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Agents Tab */}
             {activeTab === 'agents' && (
               <div className="flex flex-col md:flex-row h-full min-h-[400px] md:min-h-[500px]">
@@ -1322,54 +1481,64 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {/* Category Tabs */}
                   <div className="border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-                    <div className="flex px-2 md:px-4 overflow-x-auto">
-                      <button
-                        onClick={() => setSelectedCategory('account')}
-                        className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'account'
-                          ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                          }`}
-                      >
-                        {t('tabs.account')}
-                      </button>
-                      <button
-                        onClick={() => setSelectedCategory('permissions')}
-                        className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'permissions'
-                          ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                          }`}
-                      >
-                        {t('tabs.permissions')}
-                      </button>
-                      <button
-                        onClick={() => setSelectedCategory('mcp')}
-                        className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'mcp'
-                          ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-muted-foreground hover:text-foreground'
-                          }`}
-                      >
-                        {t('tabs.mcpServers')}
-                      </button>
+                    <div className="flex px-2 md:px-4 overflow-x-auto flex-1">
+                        <button
+                          onClick={() => setSelectedCategory('account')}
+                          className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'account'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                          {t('tabs.account')}
+                        </button>
+                        <button
+                          onClick={() => setSelectedCategory('permissions')}
+                          className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'permissions'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                          {t('tabs.permissions')}
+                        </button>
+                        <button
+                          onClick={() => setSelectedCategory('mcp')}
+                          className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'mcp'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-muted-foreground hover:text-foreground'
+                            }`}
+                        >
+                          {t('tabs.mcpServers')}
+                        </button>
                     </div>
                   </div>
 
                   {/* Category Content */}
                   <div className="flex-1 overflow-y-auto p-3 md:p-4">
-                    {/* Account Category */}
+                    {/* Account Settings Content */}
                     {selectedCategory === 'account' && (
-                      <AccountContent
-                        agent={selectedAgent}
-                        authStatus={
-                          selectedAgent === 'claude' ? claudeAuthStatus :
-                            selectedAgent === 'cursor' ? cursorAuthStatus :
-                              codexAuthStatus
-                        }
-                        onLogin={
-                          selectedAgent === 'claude' ? handleClaudeLogin :
-                            selectedAgent === 'cursor' ? handleCursorLogin :
-                              handleCodexLogin
-                        }
-                      />
+                      <div className="space-y-6 md:space-y-8">
+                        <AccountContent
+                          agentId={selectedAgent}
+                          authStatus={
+                            selectedAgent === 'claude' ? claudeAuthStatus :
+                              selectedAgent === 'cursor' ? cursorAuthStatus :
+                                selectedAgent === 'codex' ? codexAuthStatus :
+                                  geminiAuthStatus
+                          }
+                          onLogin={
+                            selectedAgent === 'claude' ? handleClaudeLogin :
+                              selectedAgent === 'cursor' ? handleCursorLogin :
+                                selectedAgent === 'codex' ? handleCodexLogin :
+                                  handleGeminiLogin
+                          }
+                          onLogout={
+                            selectedAgent === 'claude' ? handleClaudeLogout :
+                              selectedAgent === 'cursor' ? handleCursorLogout :
+                                selectedAgent === 'codex' ? handleCodexLogout :
+                                  handleGeminiLogout
+                          }
+                        />
+                      </div>
                     )}
 
                     {/* Permissions Category */}

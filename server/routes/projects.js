@@ -12,9 +12,11 @@ const upload = multer({ dest: os.tmpdir() });
 
 const router = express.Router();
 
+import { getWorkspacesRoot } from '../config.js';
+
 // Configure allowed workspace root(s) (defaults to user's home directory)
 // Accepts multiple roots separated by the OS path delimiter (Windows: ';', POSIX: ':')
-const DEFAULT_WORKSPACES_ROOT = os.homedir();
+// const DEFAULT_WORKSPACES_ROOT = os.homedir();
 
 // System-critical paths that should never be used as workspace directories
 function getForbiddenPaths() {
@@ -154,15 +156,14 @@ function isSamePathOrWithin(candidatePath, rootPath) {
 }
 
 function parseWorkspaceRoots() {
-  // Don't capture env vars at module init time; `server/index.js` loads `.env`
-  // after static imports are evaluated (ESM import hoisting).
-  const rawRoots = (process.env.WORKSPACES_ROOT || DEFAULT_WORKSPACES_ROOT).trim();
+  // Use dynamic configuration instead of static env var
+  const rawRoots = getWorkspacesRoot();
   const parts = rawRoots
     .split(path.delimiter)
     .map(p => p.trim())
     .filter(Boolean);
 
-  return parts.length > 0 ? parts : [DEFAULT_WORKSPACES_ROOT];
+  return parts.length > 0 ? parts : [os.homedir()];
 }
 
 async function resolvePathAllowingNonexistent(inputPath) {

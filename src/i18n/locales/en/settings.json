@@ -14,7 +14,13 @@
     "username": "Username",
     "email": "Email",
     "profile": "Profile",
-    "changePassword": "Change Password"
+    "changePassword": "Change Password",
+    "workspaces": {
+      "title": "Workspaces",
+      "rootLabel": "Root",
+      "currentResolved": "Current Resolved",
+      "description": "project dir"
+    }
   },
   "mcp": {
     "title": "MCP Servers",

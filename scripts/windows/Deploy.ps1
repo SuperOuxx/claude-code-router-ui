@@ -4,6 +4,7 @@ param(
   [int]$Port = 3001,
   [string]$TaskName = 'ClaudeCodeRouterUI',
   [switch]$NoPortFallback,
+  [switch]$NoPauseOnError,
   [switch]$SkipClaudeCode,
   [switch]$SkipNodeInstall,
   [switch]$SkipNpmInstall,
@@ -420,5 +421,13 @@ try {
 }
 catch {
   Write-Err $_.Exception.Message
+  if (-not $NoPauseOnError) {
+    try {
+      Write-Host ''
+      Read-Host 'Press Enter to exit'
+    } catch {
+      # Non-interactive host: can't pause.
+    }
+  }
   exit 1
 }

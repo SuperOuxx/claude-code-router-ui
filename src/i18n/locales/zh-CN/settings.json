@@ -14,7 +14,13 @@
     "username": "用户名",
     "email": "邮箱",
     "profile": "个人资料",
-    "changePassword": "修改密码"
+    "changePassword": "修改密码",
+    "workspaces": {
+      "title": "工作空间",
+      "rootLabel": "根目录",
+      "currentResolved": "当前解析",
+      "description": "项目路径"
+    }
   },
   "mcp": {
     "title": "MCP 服务器",
