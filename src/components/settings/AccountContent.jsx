@@ -99,9 +99,11 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
                 {authStatus?.loading ? (
                   t('agents.authStatus.checkingAuth')
                 ) : authStatus?.authenticated ? (
-                  t('agents.authStatus.loggedInAs', { email: authStatus.email || t('agents.authStatus.authenticatedUser') })
+                  agent === 'claude'
+                    ? t('agents.authStatus.installedVersion', { email: authStatus.email || t('agents.authStatus.authenticatedUser') })
+                    : t('agents.authStatus.loggedInAs', { email: authStatus.email || t('agents.authStatus.authenticatedUser') })
                 ) : (
-                  t('agents.authStatus.notConnected')
+                  agent === 'claude' ? t('agents.authStatus.notInstalled') : t('agents.authStatus.notConnected')
                 )}
               </div>
             </div>
@@ -112,11 +114,11 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
                 </Badge>
               ) : authStatus?.authenticated ? (
                 <Badge variant="success" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                  {t('agents.authStatus.connected')}
+                  {agent === 'claude' ? t('agents.authStatus.installed') : t('agents.authStatus.connected')}
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
-                  {t('agents.authStatus.disconnected')}
+                  {agent === 'claude' ? t('agents.authStatus.notInstalled') : t('agents.authStatus.disconnected')}
                 </Badge>
               )}
             </div>

@@ -281,10 +281,13 @@
     "authStatus": {
       "checking": "Checking...",
       "connected": "Connected",
+      "installed": "Installed",
       "notConnected": "Not connected",
       "disconnected": "Disconnected",
       "checkingAuth": "Checking authentication status...",
       "loggedInAs": "Logged in as {{email}}",
+      "installedVersion": "Installed version: {{email}}",
+      "notInstalled": "Not installed",
       "authenticatedUser": "authenticated user"
     },
     "account": {

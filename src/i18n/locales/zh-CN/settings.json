@@ -281,10 +281,13 @@
     "authStatus": {
       "checking": "检查中...",
       "connected": "已连接",
+      "installed": "已安装",
       "notConnected": "未连接",
       "disconnected": "已断开",
       "checkingAuth": "正在检查认证状态...",
       "loggedInAs": "登录为 {{email}}",
+      "installedVersion": "已安装版本: {{email}}",
+      "notInstalled": "未安装",
       "authenticatedUser": "已认证用户"
     },
     "account": {
