@@ -34,7 +34,15 @@ async function handleImages(command, images, cwd) {
       }
 
       const [, mimeType, base64Data] = matches;
-      const extension = mimeType.split('/')[1] || 'png';
+      const extensionMap = {
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/png': 'png',
+        'image/gif': 'gif',
+        'image/webp': 'webp',
+        'image/svg+xml': 'svg'
+      };
+      const extension = extensionMap[mimeType] || mimeType.split('/')[1] || 'png';
       const filename = `image_${index}.${extension}`;
       const filepath = path.join(tempDir, filename);
       await fs.writeFile(filepath, Buffer.from(base64Data, 'base64'));
@@ -42,9 +50,18 @@ async function handleImages(command, images, cwd) {
     }
 
     let modifiedCommand = command;
-    if (tempImagePaths.length > 0 && command && command.trim()) {
-      const imageNote = `\n\n[Images provided at the following paths:]\n${tempImagePaths.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
-      modifiedCommand = command + imageNote;
+    if (tempImagePaths.length > 0) {
+      const baseCommand = command && command.trim()
+        ? command
+        : 'Please analyze the attached images.';
+      const imageNote = [
+        '',
+        '[Image attachments]',
+        `The user attached ${tempImagePaths.length} image file(s).`,
+        'You must read these files before answering:',
+        ...tempImagePaths.map((p, i) => `${i + 1}. ${p}`)
+      ].join('\n');
+      modifiedCommand = `${baseCommand}\n\n${imageNote}`;
     }
 
     return { modifiedCommand, tempImagePaths, tempDir };
@@ -60,10 +77,10 @@ async function cleanupTempFiles(tempImagePaths, tempDir) {
   }
 
   for (const imagePath of tempImagePaths) {
-    await fs.unlink(imagePath).catch(() => {});
+    await fs.unlink(imagePath).catch(() => { });
   }
   if (tempDir) {
-    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(tempDir, { recursive: true, force: true }).catch(() => { });
   }
 }
 
@@ -136,9 +153,9 @@ export async function queryClaudeCLI(command, options = {}, ws) {
 
   const cliArgs = [
     ...argsPrefix,
-    // Claude Code expects the prompt to be provided via -p in print mode.
+    // CCR expects the prompt to be provided via -p in print mode.
     '-p',
-    modifiedCommand || '',
+    JSON.stringify(modifiedCommand || ''),
     '--output-format=stream-json',
     '--include-partial-messages',
     '--verbose',
@@ -319,4 +336,204 @@ export function isClaudeCLISessionActive(sessionId) {
 
 export function getActiveClaudeCLISessions() {
   return Array.from(activeClaudeCliProcesses.keys());
+}
+
+/**
+ * Query Claude using the official claude CLI (not ccr)
+ * This is similar to queryClaudeCLI but forces the use of the official claude command
+ */
+export async function queryClaudeOfficialCLI(command, options = {}, ws) {
+  const {
+    sessionId,
+    cwd,
+    projectPath,
+    toolsSettings,
+    permissionMode,
+    model,
+    images
+  } = options;
+
+  const workingDir = cwd || projectPath || process.cwd();
+  let capturedSessionId = sessionId || null;
+  let sessionCreatedSent = false;
+
+  const { modifiedCommand, tempImagePaths, tempDir } = await handleImages(command, images, workingDir);
+  if (!modifiedCommand || !modifiedCommand.trim()) {
+    const errorMessage = 'Empty prompt is not supported for Claude CLI chat mode';
+    ws.send({
+      type: 'claude-error',
+      error: errorMessage,
+      sessionId: capturedSessionId || null
+    });
+    await cleanupTempFiles(tempImagePaths, tempDir);
+    throw new Error(errorMessage);
+  }
+
+  // Force use of official claude command, not ccr
+  const cliCommand = 'claude';
+  const argsPrefix = [];
+
+  const resolvedPermissionMode = mapPermissionMode(permissionMode, toolsSettings);
+
+  const cliArgs = [
+    ...argsPrefix,
+    '-p',
+    JSON.stringify(modifiedCommand || ''),
+    '--output-format=stream-json',
+    '--include-partial-messages',
+    '--verbose',
+    '--permission-mode',
+    resolvedPermissionMode
+  ];
+
+  if (model) {
+    cliArgs.push('--model', model);
+  }
+
+  const allowedTools = toArray(toolsSettings?.allowedTools);
+  if (allowedTools.length > 0) {
+    cliArgs.push('--allowedTools', ...allowedTools);
+  }
+
+  const disallowedTools = toArray(toolsSettings?.disallowedTools);
+  if (disallowedTools.length > 0) {
+    cliArgs.push('--disallowedTools', ...disallowedTools);
+  }
+
+  if (sessionId) {
+    cliArgs.push('--resume', sessionId);
+  }
+
+  console.log('Spawning Claude official CLI chat:', cliCommand, cliArgs.join(' '));
+  console.log('Working directory:', workingDir);
+
+  const child = spawnFunction(cliCommand, cliArgs, {
+    cwd: workingDir,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env }
+  });
+
+  const processKey = capturedSessionId || Date.now().toString();
+  activeClaudeCliProcesses.set(processKey, child);
+
+  const stdoutBuffer = { value: '' };
+  let stderr = '';
+
+  const flushMessage = (message) => {
+    if (message?.session_id && !capturedSessionId) {
+      capturedSessionId = message.session_id;
+
+      if (processKey !== capturedSessionId) {
+        activeClaudeCliProcesses.delete(processKey);
+        activeClaudeCliProcesses.set(capturedSessionId, child);
+      }
+
+      if (ws.setSessionId && typeof ws.setSessionId === "function") {
+        ws.setSessionId(capturedSessionId);
+      }
+
+      if (!sessionId && !sessionCreatedSent) {
+        sessionCreatedSent = true;
+        ws.send({
+          type: 'session-created',
+          sessionId: capturedSessionId
+        });
+      }
+    }
+
+    ws.send({
+      type: 'claude-response',
+      data: message,
+      sessionId: capturedSessionId || sessionId || null
+    });
+
+    if (message?.type === 'result' && message?.modelUsage) {
+      const modelKey = Object.keys(message.modelUsage)[0];
+      const modelData = message.modelUsage[modelKey];
+      if (modelData) {
+        const inputTokens = modelData.cumulativeInputTokens || modelData.inputTokens || 0;
+        const outputTokens = modelData.cumulativeOutputTokens || modelData.outputTokens || 0;
+        const cacheReadTokens = modelData.cumulativeCacheReadInputTokens || modelData.cacheReadInputTokens || 0;
+        const cacheCreationTokens = modelData.cumulativeCacheCreationInputTokens || modelData.cacheCreationInputTokens || 0;
+        const totalUsed = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+        const contextWindow = parseInt(process.env.CONTEXT_WINDOW) || 160000;
+        ws.send({
+          type: 'token-budget',
+          data: { used: totalUsed, total: contextWindow },
+          sessionId: capturedSessionId || sessionId || null
+        });
+      }
+    }
+  };
+
+  child.stdout.on('data', (data) => {
+    const lines = parseStreamJsonLines(data.toString(), stdoutBuffer);
+    for (const line of lines) {
+      try {
+        const message = JSON.parse(line);
+        for (const normalized of normalizeClaudeCliMessage(message)) {
+          flushMessage(normalized);
+        }
+      } catch {
+        // Ignore non-JSON stdout (rare, but CLI may print warnings)
+      }
+    }
+  });
+
+  child.stderr.on('data', (data) => {
+    stderr += data.toString();
+  });
+
+  return new Promise((resolve, reject) => {
+    child.on('error', async (error) => {
+      activeClaudeCliProcesses.delete(processKey);
+      if (capturedSessionId) activeClaudeCliProcesses.delete(capturedSessionId);
+      await cleanupTempFiles(tempImagePaths, tempDir);
+      ws.send({
+        type: 'claude-error',
+        error: error.message,
+        sessionId: capturedSessionId || sessionId || null
+      });
+      reject(error);
+    });
+
+    child.on('close', async (code) => {
+      activeClaudeCliProcesses.delete(processKey);
+      if (capturedSessionId) activeClaudeCliProcesses.delete(capturedSessionId);
+
+      // Flush any buffered stdout that didn't end with newline
+      const tail = stdoutBuffer.value.trim();
+      if (tail) {
+        try {
+          const message = JSON.parse(tail);
+          for (const normalized of normalizeClaudeCliMessage(message)) {
+            flushMessage(normalized);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      await cleanupTempFiles(tempImagePaths, tempDir);
+
+      if (code === 0) {
+        ws.send({
+          type: 'claude-complete',
+          sessionId: capturedSessionId,
+          exitCode: 0,
+          isNewSession: !sessionId && !!command
+        });
+        resolve();
+        return;
+      }
+
+      const errorMessage = (stderr || '').trim() || `Claude CLI exited with code ${code}`;
+      ws.send({
+        type: 'claude-error',
+        error: errorMessage,
+        sessionId: capturedSessionId || sessionId || null
+      });
+      reject(new Error(errorMessage));
+    });
+  });
 }

@@ -14,7 +14,13 @@
     "username": "Username",
     "email": "Email",
     "profile": "Profile",
-    "changePassword": "Change Password"
+    "changePassword": "Change Password",
+    "workspaces": {
+      "title": "Workspaces",
+      "rootLabel": "Root",
+      "currentResolved": "Current Resolved",
+      "description": "project dir"
+    }
   },
   "mcp": {
     "title": "MCP Servers",
@@ -150,7 +156,11 @@
       "jsonConfig": "JSON Configuration",
       "url": "URL",
       "envVars": "Environment Variables (KEY=value, one per line)",
+      "envVarsHelp": "Supports environment variable expansion:",
+      "envVarsSyntax": "Use ${VAR} to reference environment variables, or ${VAR:-default} to provide a default value.",
+      "envVarsExample": "Example: MYSQL_HOST=${MYSQL_HOST:-localhost}",
       "headers": "Headers (KEY=value, one per line)",
+      "headersHelp": "Supports environment variable expansion (e.g., Authorization=Bearer ${API_TOKEN})",
       "selectProject": "Select a project..."
     },
     "placeholders": {
@@ -277,10 +287,13 @@
     "authStatus": {
       "checking": "Checking...",
       "connected": "Connected",
+      "installed": "Installed",
       "notConnected": "Not connected",
       "disconnected": "Disconnected",
       "checkingAuth": "Checking authentication status...",
       "loggedInAs": "Logged in as {{email}}",
+      "installedVersion": "Installed version: {{email}}",
+      "notInstalled": "Not installed",
       "authenticatedUser": "authenticated user"
     },
     "account": {

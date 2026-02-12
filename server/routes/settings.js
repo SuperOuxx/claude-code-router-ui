@@ -1,5 +1,6 @@
 import express from 'express';
 import { apiKeysDb, credentialsDb } from '../database/db.js';
+import { getServerSettings, updateServerSettings, getWorkspacesRoot } from '../config.js';
 
 const router = express.Router();
 
@@ -172,6 +173,71 @@ router.patch('/credentials/:credentialId/toggle', async (req, res) => {
   } catch (error) {
     console.error('Error toggling credential:', error);
     res.status(500).json({ error: 'Failed to toggle credential' });
+  }
+});
+
+// ===============================
+// Server Configuration Management
+// ===============================
+
+// Get server configuration (Public for verification temporarily, or add auth headers to test)
+// For now, I'll assume I need to pass an API key or similar. 
+// But wait, the previous `fetch` didn't send credentials.
+// Let's modify the verification script to simulate an authenticated request if possible, 
+// OR just temporarily allow public access to these specific endpoints for testing.
+
+// Actually, `settings.js` routes are mounted at `/api/settings`. 
+// In `index.js`, we might see `app.use('/api/settings', authenticate, settingsRoutes)`.
+// If so, I can't easily bypass it without restarting server with code changes. 
+// I'll modify `server/routes/settings.js` to potentially skip auth for localhost? 
+// No, that's messy. 
+// Let's look at `index.js` to see how auth is applied.
+router.get('/config', async (req, res) => {
+  try {
+    const settings = getServerSettings();
+    // Return all settings plus the resolved workspacesRoot
+    res.json({
+      config: {
+        ...settings,
+        // Include the resolved root so UI knows what's actually being used
+        resolvedWorkspacesRoot: getWorkspacesRoot()
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching server config:', error);
+    res.status(500).json({ error: 'Failed to fetch server configuration' });
+  }
+});
+
+// Update server configuration
+router.post('/config', async (req, res) => {
+  try {
+    const { workspacesRoot } = req.body;
+
+    // Validate inputs
+    const updates = {};
+
+    if (workspacesRoot !== undefined) {
+      if (workspacesRoot === null || workspacesRoot.trim() === '') {
+        updates.workspacesRoot = null; // Reset to default
+      } else {
+        // Basic validation - could be improved
+        updates.workspacesRoot = workspacesRoot.trim();
+      }
+    }
+
+    updateServerSettings(updates);
+
+    res.json({
+      success: true,
+      config: {
+        ...getServerSettings(),
+        resolvedWorkspacesRoot: getWorkspacesRoot()
+      }
+    });
+  } catch (error) {
+    console.error('Error updating server config:', error);
+    res.status(500).json({ error: 'Failed to update server configuration' });
   }
 });
 

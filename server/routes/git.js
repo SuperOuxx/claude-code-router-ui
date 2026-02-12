@@ -653,6 +653,15 @@ Generate the commit message:`;
         permissionMode: 'bypassPermissions',
         model: 'sonnet'
       }, writer);
+    } else if (provider === 'claude-official') {
+      // Import the queryClaudeOfficialCLI function
+      const { queryClaudeOfficialCLI } = await import('../claude-cli.js');
+
+      await queryClaudeOfficialCLI(prompt, {
+        cwd: projectPath,
+        permissionMode: 'bypassPermissions',
+        model: 'sonnet'
+      }, writer);
     } else if (provider === 'cursor') {
       await spawnCursor(prompt, {
         cwd: projectPath,

@@ -14,7 +14,13 @@
     "username": "用户名",
     "email": "邮箱",
     "profile": "个人资料",
-    "changePassword": "修改密码"
+    "changePassword": "修改密码",
+    "workspaces": {
+      "title": "工作空间",
+      "rootLabel": "根目录",
+      "currentResolved": "当前解析",
+      "description": "项目路径"
+    }
   },
   "mcp": {
     "title": "MCP 服务器",
@@ -150,7 +156,11 @@
       "jsonConfig": "JSON 配置",
       "url": "URL",
       "envVars": "环境变量（KEY=值，每行一个）",
+      "envVarsHelp": "支持环境变量扩展：",
+      "envVarsSyntax": "使用 ${VAR} 引用环境变量，或使用 ${VAR:-default} 提供默认值。",
+      "envVarsExample": "示例：MYSQL_HOST=${MYSQL_HOST:-localhost}",
       "headers": "请求头（KEY=值，每行一个）",
+      "headersHelp": "支持环境变量扩展（例如：Authorization=Bearer ${API_TOKEN}）",
       "selectProject": "选择项目..."
     },
     "placeholders": {
@@ -277,10 +287,13 @@
     "authStatus": {
       "checking": "检查中...",
       "connected": "已连接",
+      "installed": "已安装",
       "notConnected": "未连接",
       "disconnected": "已断开",
       "checkingAuth": "正在检查认证状态...",
       "loggedInAs": "登录为 {{email}}",
+      "installedVersion": "已安装版本: {{email}}",
+      "notInstalled": "未安装",
       "authenticatedUser": "已认证用户"
     },
     "account": {

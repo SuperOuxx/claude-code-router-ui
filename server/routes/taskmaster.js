@@ -31,10 +31,12 @@ const router = express.Router();
  */
 async function checkTaskMasterInstallation() {
     return new Promise((resolve) => {
+        const isWindows = os.platform() === 'win32';
+        const locatorCommand = isWindows ? 'where' : 'which';
+
         // Check if task-master command is available
-        const child = spawn('which', ['task-master'], { 
-            stdio: ['ignore', 'pipe', 'pipe'],
-            shell: true 
+        const child = spawn(locatorCommand, ['task-master'], {
+            stdio: ['ignore', 'pipe', 'pipe']
         });
         
         let output = '';
@@ -51,9 +53,8 @@ async function checkTaskMasterInstallation() {
         child.on('close', (code) => {
             if (code === 0 && output.trim()) {
                 // TaskMaster is installed, get version
-                const versionChild = spawn('task-master', ['--version'], { 
-                    stdio: ['ignore', 'pipe', 'pipe'],
-                    shell: true 
+                const versionChild = spawn('task-master', ['--version'], {
+                    stdio: ['ignore', 'pipe', 'pipe']
                 });
                 
                 let versionOutput = '';

@@ -19,7 +19,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Settings as SettingsIcon, Sparkles } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
@@ -43,12 +43,13 @@ import i18n from './i18n/config.js';
 // Main App component with routing
 function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { sessionId } = useParams();
   const { t } = useTranslation('common');
-  
+
   const { updateAvailable, latestVersion, currentVersion, releaseInfo } = useVersionCheck('siteboon', 'claudecodeui');
   const [showVersionModal, setShowVersionModal] = useState(false);
-  
+
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
   const [selectedSession, setSelectedSession] = useState(null);
@@ -85,18 +86,44 @@ function AppContent() {
 
   // Ref to track loading progress timeout for cleanup
   const loadingProgressTimeoutRef = useRef(null);
+  const mainContentRef = useRef(null);
+  const lastSessionIdRef = useRef(null);
+  const lastUserGestureAtRef = useRef(0);
+
+  const navigateWithDevTrace = useCallback((to, options) => {
+    if (import.meta.env.DEV && to === '/') {
+      console.groupCollapsed('[router] navigate(/)');
+      console.trace();
+      console.groupEnd();
+    }
+    navigate(to, options);
+  }, [navigate]);
 
   // Detect if running as PWA
   const [isPWA, setIsPWA] = useState(false);
-  
+
+  useEffect(() => {
+    const markGesture = () => {
+      lastUserGestureAtRef.current = Date.now();
+    };
+
+    window.addEventListener('pointerdown', markGesture, { capture: true });
+    window.addEventListener('keydown', markGesture, { capture: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', markGesture, { capture: true });
+      window.removeEventListener('keydown', markGesture, { capture: true });
+    };
+  }, []);
+
   useEffect(() => {
     // Check if running in standalone mode (PWA)
     const checkPWA = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                          window.navigator.standalone ||
-                          document.referrer.includes('android-app://');
+        window.navigator.standalone ||
+        document.referrer.includes('android-app://');
       setIsPWA(isStandalone);
-        document.addEventListener('touchstart', {});
+      document.addEventListener('touchstart', {});
 
       // Add class to html and body for CSS targeting
       if (isStandalone) {
@@ -107,12 +134,12 @@ function AppContent() {
         document.body.classList.remove('pwa-mode');
       }
     };
-    
+
     checkPWA();
-    
+
     // Listen for changes
     window.matchMedia('(display-mode: standalone)').addEventListener('change', checkPWA);
-    
+
     return () => {
       window.matchMedia('(display-mode: standalone)').removeEventListener('change', checkPWA);
     };
@@ -122,10 +149,10 @@ function AppContent() {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
@@ -133,6 +160,17 @@ function AppContent() {
     // Fetch projects on component mount
     fetchProjects();
   }, []);
+
+  // Persist the last visited session so we can recover from accidental route resets.
+  useEffect(() => {
+    if (!sessionId) return;
+    lastSessionIdRef.current = sessionId;
+    try {
+      sessionStorage.setItem('lastSessionId', sessionId);
+    } catch {
+      // ignore storage errors (private mode / quota)
+    }
+  }, [sessionId]);
 
   // Helper function to determine if an update is purely additive (new sessions/projects)
   // vs modifying existing selected items that would interfere with active conversations
@@ -162,7 +200,7 @@ function AppContent() {
 
     // Check if the selected session's content has changed (modification vs addition)
     // Compare key fields that would affect the loaded chat interface
-    const sessionUnchanged = 
+    const sessionUnchanged =
       currentSelectedSession.id === updatedSelectedSession.id &&
       currentSelectedSession.title === updatedSelectedSession.title &&
       currentSelectedSession.created_at === updatedSelectedSession.created_at &&
@@ -225,23 +263,23 @@ function AppContent() {
         // 1. Existing sessions: selectedSession.id exists in activeSessions
         // 2. New sessions: temporary "new-session-*" identifiers in activeSessions (before real session ID is received)
         const hasActiveSession = (selectedSession && activeSessions.has(selectedSession.id)) ||
-                                 (activeSessions.size > 0 && Array.from(activeSessions).some(id => id.startsWith('new-session-')));
-        
+          (activeSessions.size > 0 && Array.from(activeSessions).some(id => id.startsWith('new-session-')));
+
         if (hasActiveSession) {
           // Allow updates but be selective: permit additions, prevent changes to existing items
           const updatedProjects = latestMessage.projects;
           const currentProjects = projects;
-          
+
           // Check if this is purely additive (new sessions/projects) vs modification of existing ones
           const isAdditiveUpdate = isUpdateAdditive(currentProjects, updatedProjects, selectedProject, selectedSession);
-          
+
           if (!isAdditiveUpdate) {
             // Skip updates that would modify existing selected session/project
             return;
           }
           // Continue with additive updates below
         }
-        
+
         // Update projects state with the new data from WebSocket
         const updatedProjects = latestMessage.projects;
         setProjects(updatedProjects);
@@ -259,7 +297,8 @@ function AppContent() {
               const allSessions = [
                 ...(updatedSelectedProject.sessions || []),
                 ...(updatedSelectedProject.codexSessions || []),
-                ...(updatedSelectedProject.cursorSessions || [])
+                ...(updatedSelectedProject.cursorSessions || []),
+                ...(updatedSelectedProject.geminiSessions || [])
               ];
               const updatedSelectedSession = allSessions.find(s => s.id === selectedSession.id);
               if (!updatedSelectedSession) {
@@ -284,7 +323,7 @@ function AppContent() {
       setIsLoadingProjects(true);
       const response = await api.projects();
       const data = await response.json();
-      
+
       // Always fetch Cursor sessions for each project so we can combine views
       for (let project of data) {
         try {
@@ -305,19 +344,19 @@ function AppContent() {
           project.cursorSessions = [];
         }
       }
-      
+
       // Optimize to preserve object references when data hasn't changed
       setProjects(prevProjects => {
         // If no previous projects, just set the new data
         if (prevProjects.length === 0) {
           return data;
         }
-        
+
         // Check if the projects data has actually changed
         const hasChanges = data.some((newProject, index) => {
           const prevProject = prevProjects[index];
           if (!prevProject) return true;
-          
+
           // Compare key properties that would affect UI
           return (
             newProject.name !== prevProject.name ||
@@ -328,11 +367,11 @@ function AppContent() {
             JSON.stringify(newProject.cursorSessions) !== JSON.stringify(prevProject.cursorSessions)
           );
         }) || data.length !== prevProjects.length;
-        
+
         // Only update if there are actual changes
         return hasChanges ? data : prevProjects;
       });
-      
+
       // Don't auto-select any project - user should choose manually
     } catch (error) {
       console.error('Error fetching projects:', error);
@@ -349,6 +388,32 @@ function AppContent() {
     setSettingsInitialTab(tab);
     setShowSettings(true);
   }, []);
+
+  // If we're actively processing a session and the URL accidentally resets to `/`,
+  // restore the user back to the last session route.
+  useEffect(() => {
+    if (sessionId) return;
+    if (location.pathname !== '/') return;
+
+    let lastSessionId = lastSessionIdRef.current;
+    if (!lastSessionId) {
+      try {
+        lastSessionId = sessionStorage.getItem('lastSessionId');
+      } catch {
+        lastSessionId = null;
+      }
+    }
+
+    if (!lastSessionId) return;
+
+    const isSessionBusy = activeSessions.has(lastSessionId) || processingSessions.has(lastSessionId);
+    if (!isSessionBusy) return;
+
+    // If the user just interacted (e.g. clicked "New Session"), don't fight their navigation.
+    if (Date.now() - lastUserGestureAtRef.current < 1500) return;
+
+    navigate(`/session/${lastSessionId}`, { replace: true });
+  }, [activeSessions, location.pathname, navigate, processingSessions, sessionId]);
 
   // Handle URL-based session loading
   useEffect(() => {
@@ -378,18 +443,34 @@ function AppContent() {
           setActiveTab('chat');
           return;
         }
+        // Also check Codex sessions
+        const codexSession = project.codexSessions?.find(s => s.id === sessionId);
+        if (codexSession) {
+          setSelectedProject(project);
+          setSelectedSession({ ...codexSession, __provider: 'codex' });
+          setActiveTab('chat');
+          return;
+        }
+        // Also check Gemini sessions
+        const geminiSession = project.geminiSessions?.find(s => s.id === sessionId);
+        if (geminiSession) {
+          setSelectedProject(project);
+          setSelectedSession({ ...geminiSession, __provider: 'gemini' });
+          setActiveTab('chat');
+          return;
+        }
       }
 
       // If session not found, it might be a newly created session
       // Just navigate to it and it will be found when the sidebar refreshes
       // Don't redirect to home, let the session load naturally
     }
-  }, [sessionId, projects, navigate]);
+  }, [sessionId, projects, navigate, selectedSession]);
 
   const handleProjectSelect = (project) => {
     setSelectedProject(project);
     setSelectedSession(null);
-    navigate('/');
+    navigateWithDevTrace('/');
     if (isMobile) {
       setSidebarOpen(false);
     }
@@ -429,7 +510,7 @@ function AppContent() {
     setSelectedProject(project);
     setSelectedSession(null);
     setActiveTab('chat');
-    navigate('/');
+    navigateWithDevTrace('/');
     if (isMobile) {
       setSidebarOpen(false);
     }
@@ -439,11 +520,11 @@ function AppContent() {
     // If the deleted session was currently selected, clear it
     if (selectedSession?.id === sessionId) {
       setSelectedSession(null);
-      navigate('/');
+      navigateWithDevTrace('/');
     }
-    
+
     // Update projects state locally instead of full refresh
-    setProjects(prevProjects => 
+    setProjects(prevProjects =>
       prevProjects.map(project => ({
         ...project,
         sessions: project.sessions?.filter(session => session.id !== sessionId) || [],
@@ -462,14 +543,14 @@ function AppContent() {
     try {
       const response = await api.projects();
       const freshProjects = await response.json();
-      
+
       // Optimize to preserve object references and minimize re-renders
       setProjects(prevProjects => {
         // Check if projects data has actually changed
         const hasChanges = freshProjects.some((newProject, index) => {
           const prevProject = prevProjects[index];
           if (!prevProject) return true;
-          
+
           return (
             newProject.name !== prevProject.name ||
             newProject.displayName !== prevProject.displayName ||
@@ -478,10 +559,10 @@ function AppContent() {
             JSON.stringify(newProject.sessions) !== JSON.stringify(prevProject.sessions)
           );
         }) || freshProjects.length !== prevProjects.length;
-        
+
         return hasChanges ? freshProjects : prevProjects;
       });
-      
+
       // If we have a selected project, make sure it's still selected after refresh
       if (selectedProject) {
         const refreshedProject = freshProjects.find(p => p.name === selectedProject.name);
@@ -490,7 +571,7 @@ function AppContent() {
           if (JSON.stringify(refreshedProject) !== JSON.stringify(selectedProject)) {
             setSelectedProject(refreshedProject);
           }
-          
+
           // If we have a selected session, try to find it in the refreshed project
           if (selectedSession) {
             const refreshedSession = refreshedProject.sessions?.find(s => s.id === selectedSession.id);
@@ -510,17 +591,17 @@ function AppContent() {
     if (selectedProject?.name === projectName) {
       setSelectedProject(null);
       setSelectedSession(null);
-      navigate('/');
+      navigateWithDevTrace('/');
     }
-    
+
     // Update projects state locally instead of full refresh
-    setProjects(prevProjects => 
+    setProjects(prevProjects =>
       prevProjects.filter(project => project.name !== projectName)
     );
   };
 
   // Session Protection Functions: Manage the lifecycle of active sessions
-  
+
   // markSessionAsActive: Called when user sends a message to mark session as protected
   // This includes both real session IDs and temporary "new-session-*" identifiers
   const markSessionAsActive = useCallback((sessionId) => {
@@ -579,12 +660,21 @@ function AppContent() {
     }
   }, []);
 
+  const handleSidebarFileOpen = useCallback(function handleSidebarFileOpen(filePath, diffInfo = null, projectNameOverride = null) {
+    mainContentRef.current?.openFile?.(filePath, diffInfo, projectNameOverride);
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [isMobile]);
+
   // Version Upgrade Modal Component
   const VersionUpgradeModal = () => {
     const { t } = useTranslation('common');
     const [isUpdating, setIsUpdating] = useState(false);
     const [updateOutput, setUpdateOutput] = useState('');
     const [updateError, setUpdateError] = useState('');
+    const [isCcrExecuting, setIsCcrExecuting] = useState(false);
+    const [ccrOutput, setCcrOutput] = useState('');
 
     if (!showVersionModal) return null;
 
@@ -636,6 +726,33 @@ function AppContent() {
       }
     };
 
+    const handleCcrUi = async () => {
+      setIsCcrExecuting(true);
+      setCcrOutput('Launching CCR UI configuration...\n');
+
+      try {
+        const response = await authenticatedFetch('/api/system/ccr-ui', {
+          method: 'POST',
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          setCcrOutput(prev => prev + data.output + '\n');
+          setCcrOutput(prev => prev + '\n✅ ' + (data.message || 'CCR UI launched successfully') + '\n');
+        } else {
+          setCcrOutput(prev => prev + '\n❌ Failed: ' + (data.error || 'Unknown error') + '\n');
+          if (data.errorOutput) {
+            setCcrOutput(prev => prev + data.errorOutput + '\n');
+          }
+        }
+      } catch (error) {
+        setCcrOutput(prev => prev + '\n❌ Error: ' + error.message + '\n');
+      } finally {
+        setIsCcrExecuting(false);
+      }
+    };
+
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         {/* Backdrop */}
@@ -680,9 +797,36 @@ function AppContent() {
             </div>
             <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
               <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t('versionUpdate.latestVersion')}</span>
-              <span className="text-sm text-blue-900 dark:text-blue-100 font-mono">{latestVersion}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-blue-900 dark:text-blue-100 font-mono">{latestVersion}</span>
+                <button
+                  onClick={handleCcrUi}
+                  disabled={isCcrExecuting}
+                  className="px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-800/40 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Configure CCR (Claude Code Router)"
+                >
+                  {isCcrExecuting ? (
+                    <>
+                      <div className="inline-block w-3 h-3 border-2 border-blue-700 dark:border-blue-300 border-t-transparent rounded-full animate-spin mr-1" />
+                      Running...
+                    </>
+                  ) : (
+                    'Configure CCR'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* CCR Output */}
+          {ccrOutput && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-gray-900 dark:text-white">CCR Configuration Output</h3>
+              <div className="bg-gray-900 dark:bg-gray-950 rounded-lg p-4 border border-gray-700 max-h-48 overflow-y-auto">
+                <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{ccrOutput}</pre>
+              </div>
+            </div>
+          )}
 
           {/* Changelog */}
           {releaseInfo?.body && (
@@ -781,9 +925,8 @@ function AppContent() {
       {/* Fixed Desktop Sidebar */}
       {!isMobile && (
         <div
-          className={`h-full flex-shrink-0 border-r border-border bg-card transition-all duration-300 ${
-            sidebarVisible ? 'w-80' : 'w-14'
-          }`}
+          className={`h-full flex-shrink-0 border-r border-border bg-card transition-all duration-300 ${sidebarVisible ? 'w-80' : 'w-14'
+            }`}
         >
           <div className="h-full overflow-hidden">
             {sidebarVisible ? (
@@ -796,6 +939,7 @@ function AppContent() {
                 onNewSession={handleNewSession}
                 onSessionDelete={handleSessionDelete}
                 onProjectDelete={handleProjectDelete}
+                onFileOpen={handleSidebarFileOpen}
                 isLoading={isLoadingProjects}
                 loadingProgress={loadingProgress}
                 onRefresh={handleSidebarRefresh}
@@ -859,9 +1003,8 @@ function AppContent() {
 
       {/* Mobile Sidebar Overlay */}
       {isMobile && (
-        <div className={`fixed inset-0 z-50 flex transition-all duration-150 ease-out ${
-          sidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
-        }`}>
+        <div className={`fixed inset-0 z-50 flex transition-all duration-150 ease-out ${sidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
+          }`}>
           <button
             className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity duration-150 ease-out"
             onClick={(e) => {
@@ -876,9 +1019,8 @@ function AppContent() {
             aria-label={t('versionUpdate.ariaLabels.closeSidebar')}
           />
           <div
-            className={`relative w-[85vw] max-w-sm sm:w-80 h-full bg-card border-r border-border transform transition-transform duration-150 ease-out ${
-              sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            }`}
+            className={`relative w-[85vw] max-w-sm sm:w-80 h-full bg-card border-r border-border transform transition-transform duration-150 ease-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              }`}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
           >
@@ -891,6 +1033,7 @@ function AppContent() {
               onNewSession={handleNewSession}
               onSessionDelete={handleSessionDelete}
               onProjectDelete={handleProjectDelete}
+              onFileOpen={handleSidebarFileOpen}
               isLoading={isLoadingProjects}
               loadingProgress={loadingProgress}
               onRefresh={handleSidebarRefresh}
@@ -911,6 +1054,7 @@ function AppContent() {
       {/* Main Content Area - Flexible */}
       <div className={`flex-1 flex flex-col min-w-0 ${isMobile && !isInputFocused ? 'pb-mobile-nav' : ''}`}>
         <MainContent
+          ref={mainContentRef}
           selectedProject={selectedProject}
           selectedSession={selectedSession}
           activeTab={activeTab}
@@ -979,6 +1123,7 @@ function AppContent() {
 
       {/* Version Upgrade Modal */}
       <VersionUpgradeModal />
+      <Outlet />
     </div>
   );
 }
@@ -995,10 +1140,11 @@ function App() {
             <TasksSettingsProvider>
               <TaskMasterProvider>
                 <ProtectedRoute>
-                  <Router basename={window.__ROUTER_BASENAME__ || ''}>                                                                                                      
+                  <Router basename={window.__ROUTER_BASENAME__ || ''}>
                     <Routes>
-                      <Route path="/" element={<AppContent />} />
-                      <Route path="/session/:sessionId" element={<AppContent />} />
+                      <Route path="/" element={<AppContent />}>
+                        <Route path="session/:sessionId" element={<></>} />
+                      </Route>
                     </Routes>
                   </Router>
                 </ProtectedRoute>

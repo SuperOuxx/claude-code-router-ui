@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import ClaudeLogo from './ClaudeLogo';
 import CursorLogo from './CursorLogo';
 import CodexLogo from './CodexLogo';
+import GeminiLogo from './GeminiLogo';
 import CredentialsSettings from './CredentialsSettings';
 import GitSettings from './GitSettings';
 import TasksSettings from './TasksSettings';
@@ -32,6 +33,9 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [projectSortOrder, setProjectSortOrder] = useState('name');
+  const [workspacesRoot, setWorkspacesRoot] = useState('');
+  const [resolvedWorkspacesRoot, setResolvedWorkspacesRoot] = useState('');
+  const [workspacesRootLoading, setWorkspacesRootLoading] = useState(false);
 
   const [mcpServers, setMcpServers] = useState([]);
   const [showMcpForm, setShowMcpForm] = useState(false);
@@ -58,7 +62,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const [mcpToolsLoading, setMcpToolsLoading] = useState({});
   const [activeTab, setActiveTab] = useState(initialTab);
   const [jsonValidationError, setJsonValidationError] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState('claude'); // 'claude', 'cursor', or 'codex'
+  const [selectedAgent, setSelectedAgent] = useState('claude'); // 'claude', 'cursor', 'codex', or 'gemini'
   const [selectedCategory, setSelectedCategory] = useState('account'); // 'account', 'permissions', or 'mcp'
 
   // Code Editor settings
@@ -77,7 +81,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
   const [codeEditorFontSize, setCodeEditorFontSize] = useState(() =>
     localStorage.getItem('codeEditorFontSize') || '14'
   );
-  
+
   // Cursor-specific states
   const [cursorAllowedCommands, setCursorAllowedCommands] = useState([]);
   const [cursorDisallowedCommands, setCursorDisallowedCommands] = useState([]);
@@ -124,6 +128,12 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
     loading: true,
     error: null
   });
+  const [geminiAuthStatus, setGeminiAuthStatus] = useState({
+    authenticated: false,
+    email: null,
+    loading: true,
+    error: null
+  });
 
   // Common tool patterns for Claude
   const commonTools = [
@@ -142,7 +152,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
     'WebFetch',
     'WebSearch'
   ];
-  
+
   // Common shell commands for Cursor
   const commonCursorCommands = [
     'Shell(ls)',
@@ -532,10 +542,10 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
 
   const loadSettings = async () => {
     try {
-      
+
       // Load Claude settings from localStorage
       const savedSettings = localStorage.getItem('claude-settings');
-      
+
       if (savedSettings) {
         const settings = JSON.parse(savedSettings);
         setAllowedTools(settings.allowedTools || []);
@@ -549,7 +559,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         setSkipPermissions(false);
         setProjectSortOrder('name');
       }
-      
+
       // Load Cursor settings from localStorage
       const savedCursorSettings = localStorage.getItem('cursor-tools-settings');
 
@@ -583,12 +593,61 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
 
       // Load Codex MCP servers
       await fetchCodexMcpServers();
+
+      // Load Server Config
+      loadServerConfig();
     } catch (error) {
       console.error('Error loading tool settings:', error);
       setAllowedTools([]);
       setDisallowedTools([]);
       setSkipPermissions(false);
       setProjectSortOrder('name');
+    }
+  };
+
+  const loadServerConfig = async () => {
+    try {
+      setWorkspacesRootLoading(true);
+      const response = await authenticatedFetch('/api/settings/config');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.config) {
+          setWorkspacesRoot(data.config.workspacesRoot || '');
+          setResolvedWorkspacesRoot(data.config.resolvedWorkspacesRoot || '');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading server config:', error);
+    } finally {
+      setWorkspacesRootLoading(false);
+    }
+  };
+
+  const saveWorkspacesRoot = async () => {
+    try {
+      setWorkspacesRootLoading(true);
+      const response = await authenticatedFetch('/api/settings/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspacesRoot })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.config) {
+          setWorkspacesRoot(data.config.workspacesRoot || '');
+          setResolvedWorkspacesRoot(data.config.resolvedWorkspacesRoot || '');
+          setSaveStatus('success');
+          setTimeout(() => setSaveStatus(null), 3000);
+        }
+      } else {
+        setSaveStatus('error');
+      }
+    } catch (error) {
+      console.error('Error saving workspaces root:', error);
+      setSaveStatus('error');
+    } finally {
+      setWorkspacesRootLoading(false);
     }
   };
 
@@ -713,14 +772,70 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         checkCursorAuthStatus();
       } else if (loginProvider === 'codex') {
         checkCodexAuthStatus();
+      } else if (loginProvider === 'gemini') {
+        checkGeminiAuthStatus();
       }
     }
+  };
+
+  const handleClaudeLogout = async () => {
+    // Currently no API to logout from CLI, so just clear state
+    // In a real implementation we would call an endpoint to runs `claude logout`
+    setClaudeAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const handleCursorLogout = async () => {
+    setCursorAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const handleCodexLogout = async () => {
+    setCodexAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const handleGeminiLogin = () => {
+    setLoginProvider('gemini');
+    setSelectedProject(projects?.[0] || { name: 'default', fullPath: process.cwd() });
+    setShowLoginModal(true);
+  };
+
+  const handleGeminiLogout = async () => {
+    setGeminiAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
+  };
+
+  const checkGeminiAuthStatus = async () => {
+    // Placeholder for Gemini auth check
+    setGeminiAuthStatus({
+      authenticated: false,
+      email: null,
+      loading: false,
+      error: null
+    });
   };
 
   const saveSettings = () => {
     setIsSaving(true);
     setSaveStatus(null);
-    
+
     try {
       // Save Claude settings
       const claudeSettings = {
@@ -730,7 +845,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         projectSortOrder,
         lastUpdated: new Date().toISOString()
       };
-      
+
       // Save Cursor settings
       const cursorSettings = {
         allowedCommands: cursorAllowedCommands,
@@ -751,7 +866,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
       localStorage.setItem('codex-settings', JSON.stringify(codexSettings));
 
       setSaveStatus('success');
-      
+
       setTimeout(() => {
         onClose();
       }, 1000);
@@ -829,9 +944,9 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
 
   const handleMcpSubmit = async (e) => {
     e.preventDefault();
-    
+
     setMcpLoading(true);
-    
+
     try {
       if (mcpFormData.importMode === 'json') {
         // Use JSON import endpoint
@@ -890,13 +1005,13 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
       const result = await testMcpServer(serverId, scope);
       setMcpTestResults({ ...mcpTestResults, [serverId]: result });
     } catch (error) {
-      setMcpTestResults({ 
-        ...mcpTestResults, 
-        [serverId]: { 
-          success: false, 
+      setMcpTestResults({
+        ...mcpTestResults,
+        [serverId]: {
+          success: false,
           message: error.message,
           details: []
-        } 
+        }
       });
     }
   };
@@ -907,14 +1022,14 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
       const result = await discoverMcpTools(serverId, scope);
       setMcpServerTools({ ...mcpServerTools, [serverId]: result });
     } catch (error) {
-      setMcpServerTools({ 
-        ...mcpServerTools, 
-        [serverId]: { 
-          success: false, 
-          tools: [], 
-          resources: [], 
-          prompts: [] 
-        } 
+      setMcpServerTools({
+        ...mcpServerTools,
+        [serverId]: {
+          success: false,
+          tools: [],
+          resources: [],
+          prompts: []
+        }
       });
     } finally {
       setMcpToolsLoading({ ...mcpToolsLoading, [serverId]: false });
@@ -966,56 +1081,61 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         <div className="flex-1 overflow-y-auto">
           {/* Tab Navigation */}
           <div className="border-b border-border">
-            <div className="flex px-4 md:px-6">
+            <div className="flex px-4 md:px-6 overflow-x-auto">
+              <button
+                onClick={() => setActiveTab('workspace')}
+                className={`px-3 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap inline-flex items-center gap-2 ${activeTab === 'workspace'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
+              >
+                <FolderOpen className="w-4 h-4" />
+                <span>{t('account.workspaces.title') || 'Workspaces'}</span>
+              </button>
               <button
                 onClick={() => setActiveTab('agents')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'agents'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'agents'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 {t('mainTabs.agents')}
               </button>
               <button
                 onClick={() => setActiveTab('appearance')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'appearance'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'appearance'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 {t('mainTabs.appearance')}
               </button>
               <button
                 onClick={() => setActiveTab('git')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'git'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'git'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 <GitBranch className="w-4 h-4 inline mr-2" />
                 {t('mainTabs.git')}
               </button>
               <button
                 onClick={() => setActiveTab('api')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'api'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'api'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 <Key className="w-4 h-4 inline mr-2" />
                 {t('mainTabs.apiTokens')}
               </button>
               <button
                 onClick={() => setActiveTab('tasks')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'tasks'
-                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'tasks'
+                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 {t('mainTabs.tasks')}
               </button>
@@ -1023,236 +1143,272 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
           </div>
 
           <div className="p-4 md:p-6 space-y-6 md:space-y-8 pb-safe-area-inset-bottom">
-            
+
             {/* Appearance Tab */}
             {activeTab === 'appearance' && (
               <div className="space-y-6 md:space-y-8">
-               {activeTab === 'appearance' && (
-  <div className="space-y-6 md:space-y-8">
-    {/* Theme Settings */}
-    <div className="space-y-4">
-      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-foreground">
-              {t('appearanceSettings.darkMode.label')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {t('appearanceSettings.darkMode.description')}
-            </div>
-          </div>
-          <button
-            onClick={toggleDarkMode}
-            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-            role="switch"
-            aria-checked={isDarkMode}
-            aria-label="Toggle dark mode"
-          >
-            <span className="sr-only">Toggle dark mode</span>
-            <span
-              className={`${
-                isDarkMode ? 'translate-x-7' : 'translate-x-1'
-              } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 flex items-center justify-center`}
-            >
-              {isDarkMode ? (
-                <Moon className="w-3.5 h-3.5 text-gray-700" />
-              ) : (
-                <Sun className="w-3.5 h-3.5 text-yellow-500" />
-              )}
-            </span>
-          </button>
-        </div>
-      </div>
-    </div>
+                {activeTab === 'appearance' && (
+                  <div className="space-y-6 md:space-y-8">
+                    {/* Theme Settings */}
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {t('appearanceSettings.darkMode.label')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {t('appearanceSettings.darkMode.description')}
+                            </div>
+                          </div>
+                          <button
+                            onClick={toggleDarkMode}
+                            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                            role="switch"
+                            aria-checked={isDarkMode}
+                            aria-label="Toggle dark mode"
+                          >
+                            <span className="sr-only">Toggle dark mode</span>
+                            <span
+                              className={`${isDarkMode ? 'translate-x-7' : 'translate-x-1'
+                                } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 flex items-center justify-center`}
+                            >
+                              {isDarkMode ? (
+                                <Moon className="w-3.5 h-3.5 text-gray-700" />
+                              ) : (
+                                <Sun className="w-3.5 h-3.5 text-yellow-500" />
+                              )}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
 
-    {/* Language Selector */}
-    <div className="space-y-4">
-      <LanguageSelector />
-    </div>
+                    {/* Language Selector */}
+                    <div className="space-y-4">
+                      <LanguageSelector />
+                    </div>
 
-    {/* Project Sorting */}
-    <div className="space-y-4">
-      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-foreground">
-              {t('appearanceSettings.projectSorting.label')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {t('appearanceSettings.projectSorting.description')}
-            </div>
-          </div>
-          <select
-            value={projectSortOrder}
-            onChange={(e) => setProjectSortOrder(e.target.value)}
-            className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-32"
-          >
-            <option value="name">{t('appearanceSettings.projectSorting.alphabetical')}</option>
-            <option value="date">{t('appearanceSettings.projectSorting.recentActivity')}</option>
-          </select>
-        </div>
-      </div>
-    </div>
+                    {/* Project Sorting */}
+                    <div className="space-y-4">
+                      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {t('appearanceSettings.projectSorting.label')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {t('appearanceSettings.projectSorting.description')}
+                            </div>
+                          </div>
+                          <select
+                            value={projectSortOrder}
+                            onChange={(e) => setProjectSortOrder(e.target.value)}
+                            className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-32"
+                          >
+                            <option value="name">{t('appearanceSettings.projectSorting.alphabetical')}</option>
+                            <option value="date">{t('appearanceSettings.projectSorting.recentActivity')}</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
 
-    {/* Code Editor Settings */}
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-foreground">{t('appearanceSettings.codeEditor.title')}</h3>
+                    {/* Code Editor Settings */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-foreground">{t('appearanceSettings.codeEditor.title')}</h3>
 
-      {/* Editor Theme */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-foreground">
-              {t('appearanceSettings.codeEditor.theme.label')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {t('appearanceSettings.codeEditor.theme.description')}
-            </div>
-          </div>
-          <button
-            onClick={() => setCodeEditorTheme(codeEditorTheme === 'dark' ? 'light' : 'dark')}
-            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-            role="switch"
-            aria-checked={codeEditorTheme === 'dark'}
-            aria-label="Toggle editor theme"
-          >
-            <span className="sr-only">Toggle editor theme</span>
-            <span
-              className={`${
-                codeEditorTheme === 'dark' ? 'translate-x-7' : 'translate-x-1'
-              } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 flex items-center justify-center`}
-            >
-              {codeEditorTheme === 'dark' ? (
-                <Moon className="w-3.5 h-3.5 text-gray-700" />
-              ) : (
-                <Sun className="w-3.5 h-3.5 text-yellow-500" />
-              )}
-            </span>
-          </button>
-        </div>
-      </div>
+                      {/* Editor Theme */}
+                      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {t('appearanceSettings.codeEditor.theme.label')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {t('appearanceSettings.codeEditor.theme.description')}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setCodeEditorTheme(codeEditorTheme === 'dark' ? 'light' : 'dark')}
+                            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                            role="switch"
+                            aria-checked={codeEditorTheme === 'dark'}
+                            aria-label="Toggle editor theme"
+                          >
+                            <span className="sr-only">Toggle editor theme</span>
+                            <span
+                              className={`${codeEditorTheme === 'dark' ? 'translate-x-7' : 'translate-x-1'
+                                } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200 flex items-center justify-center`}
+                            >
+                              {codeEditorTheme === 'dark' ? (
+                                <Moon className="w-3.5 h-3.5 text-gray-700" />
+                              ) : (
+                                <Sun className="w-3.5 h-3.5 text-yellow-500" />
+                              )}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
 
-      {/* Word Wrap */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-foreground">
-              {t('appearanceSettings.codeEditor.wordWrap.label')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {t('appearanceSettings.codeEditor.wordWrap.description')}
-            </div>
-          </div>
-          <button
-            onClick={() => setCodeEditorWordWrap(!codeEditorWordWrap)}
-            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-            role="switch"
-            aria-checked={codeEditorWordWrap}
-            aria-label="Toggle word wrap"
-          >
-            <span className="sr-only">Toggle word wrap</span>
-            <span
-              className={`${
-                codeEditorWordWrap ? 'translate-x-7' : 'translate-x-1'
-              } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200`}
-            />
-          </button>
-        </div>
-      </div>
+                      {/* Word Wrap */}
+                      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {t('appearanceSettings.codeEditor.wordWrap.label')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {t('appearanceSettings.codeEditor.wordWrap.description')}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setCodeEditorWordWrap(!codeEditorWordWrap)}
+                            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                            role="switch"
+                            aria-checked={codeEditorWordWrap}
+                            aria-label="Toggle word wrap"
+                          >
+                            <span className="sr-only">Toggle word wrap</span>
+                            <span
+                              className={`${codeEditorWordWrap ? 'translate-x-7' : 'translate-x-1'
+                                } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200`}
+                            />
+                          </button>
+                        </div>
+                      </div>
 
-      {/* Show Minimap */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-foreground">
-              {t('appearanceSettings.codeEditor.showMinimap.label')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {t('appearanceSettings.codeEditor.showMinimap.description')}
-            </div>
-          </div>
-          <button
-            onClick={() => setCodeEditorShowMinimap(!codeEditorShowMinimap)}
-            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-            role="switch"
-            aria-checked={codeEditorShowMinimap}
-            aria-label="Toggle minimap"
-          >
-            <span className="sr-only">Toggle minimap</span>
-            <span
-              className={`${
-                codeEditorShowMinimap ? 'translate-x-7' : 'translate-x-1'
-              } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200`}
-            />
-          </button>
-        </div>
-      </div>
+                      {/* Show Minimap */}
+                      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {t('appearanceSettings.codeEditor.showMinimap.label')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {t('appearanceSettings.codeEditor.showMinimap.description')}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setCodeEditorShowMinimap(!codeEditorShowMinimap)}
+                            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                            role="switch"
+                            aria-checked={codeEditorShowMinimap}
+                            aria-label="Toggle minimap"
+                          >
+                            <span className="sr-only">Toggle minimap</span>
+                            <span
+                              className={`${codeEditorShowMinimap ? 'translate-x-7' : 'translate-x-1'
+                                } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200`}
+                            />
+                          </button>
+                        </div>
+                      </div>
 
-      {/* Show Line Numbers */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-foreground">
-              {t('appearanceSettings.codeEditor.lineNumbers.label')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {t('appearanceSettings.codeEditor.lineNumbers.description')}
-            </div>
-          </div>
-          <button
-            onClick={() => setCodeEditorLineNumbers(!codeEditorLineNumbers)}
-            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-            role="switch"
-            aria-checked={codeEditorLineNumbers}
-            aria-label="Toggle line numbers"
-          >
-            <span className="sr-only">Toggle line numbers</span>
-            <span
-              className={`${
-                codeEditorLineNumbers ? 'translate-x-7' : 'translate-x-1'
-              } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200`}
-            />
-          </button>
-        </div>
-      </div>
+                      {/* Show Line Numbers */}
+                      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {t('appearanceSettings.codeEditor.lineNumbers.label')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {t('appearanceSettings.codeEditor.lineNumbers.description')}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setCodeEditorLineNumbers(!codeEditorLineNumbers)}
+                            className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 dark:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                            role="switch"
+                            aria-checked={codeEditorLineNumbers}
+                            aria-label="Toggle line numbers"
+                          >
+                            <span className="sr-only">Toggle line numbers</span>
+                            <span
+                              className={`${codeEditorLineNumbers ? 'translate-x-7' : 'translate-x-1'
+                                } inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-200`}
+                            />
+                          </button>
+                        </div>
+                      </div>
 
-      {/* Font Size */}
-      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="font-medium text-foreground">
-              {t('appearanceSettings.codeEditor.fontSize.label')}
-            </div>
-            <div className="text-sm text-muted-foreground">
-              {t('appearanceSettings.codeEditor.fontSize.description')}
-            </div>
-          </div>
-          <select
-            value={codeEditorFontSize}
-            onChange={(e) => setCodeEditorFontSize(e.target.value)}
-            className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-24"
-          >
-            <option value="10">10px</option>
-            <option value="11">11px</option>
-            <option value="12">12px</option>
-            <option value="13">13px</option>
-            <option value="14">14px</option>
-            <option value="15">15px</option>
-            <option value="16">16px</option>
-            <option value="18">18px</option>
-            <option value="20">20px</option>
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+                      {/* Font Size */}
+                      <div className="bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {t('appearanceSettings.codeEditor.fontSize.label')}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {t('appearanceSettings.codeEditor.fontSize.description')}
+                            </div>
+                          </div>
+                          <select
+                            value={codeEditorFontSize}
+                            onChange={(e) => setCodeEditorFontSize(e.target.value)}
+                            className="text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2 w-24"
+                          >
+                            <option value="10">10px</option>
+                            <option value="11">11px</option>
+                            <option value="12">12px</option>
+                            <option value="13">13px</option>
+                            <option value="14">14px</option>
+                            <option value="15">15px</option>
+                            <option value="16">16px</option>
+                            <option value="18">18px</option>
+                            <option value="20">20px</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
             )}
 
             {/* Git Tab */}
             {activeTab === 'git' && <GitSettings />}
+
+            {/* Workspace Tab */}
+            {activeTab === 'workspace' && (
+              <div className="space-y-6 md:space-y-8">
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+                  <h3 className="text-lg font-medium text-foreground mb-4 flex items-center gap-2">
+                    <FolderOpen className="w-5 h-5" />
+                    {t('account.workspaces.title') || 'Workspaces Configuration'}
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-2">
+                        {t('account.workspaces.rootLabel') || 'Workspaces Root Directory'}
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          value={workspacesRoot}
+                          onChange={(e) => setWorkspacesRoot(e.target.value)}
+                          placeholder={t('account.workspaces.rootPlaceholder') || 'e.g. ~/Projects or D:\\Projects'}
+                          className="flex-1"
+                        />
+                        <Button
+                          onClick={saveWorkspacesRoot}
+                          disabled={workspacesRootLoading}
+                          className="min-w-[80px]"
+                        >
+                          {workspacesRootLoading ? 'Saving...' : (t('common.save') || 'Save')}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {(t('account.workspaces.currentResolved') || 'Current resolved path:')} <span className="font-mono bg-gray-100 dark:bg-gray-900 px-1 rounded">{resolvedWorkspacesRoot || 'Loading...'}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('account.workspaces.description') || 'Directory where new projects will be created. Defaults to home directory if empty.'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Agents Tab */}
             {activeTab === 'agents' && (
@@ -1281,6 +1437,13 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       onClick={() => setSelectedAgent('codex')}
                       isMobile={true}
                     />
+                    <AgentListItem
+                      agentId="gemini"
+                      authStatus={geminiAuthStatus}
+                      isSelected={selectedAgent === 'gemini'}
+                      onClick={() => setSelectedAgent('gemini')}
+                      isMobile={true}
+                    />
                   </div>
                 </div>
 
@@ -1305,6 +1468,12 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       isSelected={selectedAgent === 'codex'}
                       onClick={() => setSelectedAgent('codex')}
                     />
+                    <AgentListItem
+                      agentId="gemini"
+                      authStatus={geminiAuthStatus}
+                      isSelected={selectedAgent === 'gemini'}
+                      onClick={() => setSelectedAgent('gemini')}
+                    />
                   </div>
                 </div>
 
@@ -1312,57 +1481,64 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {/* Category Tabs */}
                   <div className="border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-                    <div className="flex px-2 md:px-4 overflow-x-auto">
-                      <button
-                        onClick={() => setSelectedCategory('account')}
-                        className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                          selectedCategory === 'account'
+                    <div className="flex px-2 md:px-4 overflow-x-auto flex-1">
+                        <button
+                          onClick={() => setSelectedCategory('account')}
+                          className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'account'
                             ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                             : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        {t('tabs.account')}
-                      </button>
-                      <button
-                        onClick={() => setSelectedCategory('permissions')}
-                        className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                          selectedCategory === 'permissions'
+                            }`}
+                        >
+                          {t('tabs.account')}
+                        </button>
+                        <button
+                          onClick={() => setSelectedCategory('permissions')}
+                          className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'permissions'
                             ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                             : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        {t('tabs.permissions')}
-                      </button>
-                      <button
-                        onClick={() => setSelectedCategory('mcp')}
-                        className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                          selectedCategory === 'mcp'
+                            }`}
+                        >
+                          {t('tabs.permissions')}
+                        </button>
+                        <button
+                          onClick={() => setSelectedCategory('mcp')}
+                          className={`px-3 md:px-4 py-2 md:py-3 text-xs md:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${selectedCategory === 'mcp'
                             ? 'border-blue-600 text-blue-600 dark:text-blue-400'
                             : 'border-transparent text-muted-foreground hover:text-foreground'
-                        }`}
-                      >
-                        {t('tabs.mcpServers')}
-                      </button>
+                            }`}
+                        >
+                          {t('tabs.mcpServers')}
+                        </button>
                     </div>
                   </div>
 
                   {/* Category Content */}
                   <div className="flex-1 overflow-y-auto p-3 md:p-4">
-                    {/* Account Category */}
+                    {/* Account Settings Content */}
                     {selectedCategory === 'account' && (
-                      <AccountContent
-                        agent={selectedAgent}
-                        authStatus={
-                          selectedAgent === 'claude' ? claudeAuthStatus :
-                          selectedAgent === 'cursor' ? cursorAuthStatus :
-                          codexAuthStatus
-                        }
-                        onLogin={
-                          selectedAgent === 'claude' ? handleClaudeLogin :
-                          selectedAgent === 'cursor' ? handleCursorLogin :
-                          handleCodexLogin
-                        }
-                      />
+                      <div className="space-y-6 md:space-y-8">
+                        <AccountContent
+                          agentId={selectedAgent}
+                          authStatus={
+                            selectedAgent === 'claude' ? claudeAuthStatus :
+                              selectedAgent === 'cursor' ? cursorAuthStatus :
+                                selectedAgent === 'codex' ? codexAuthStatus :
+                                  geminiAuthStatus
+                          }
+                          onLogin={
+                            selectedAgent === 'claude' ? handleClaudeLogin :
+                              selectedAgent === 'cursor' ? handleCursorLogin :
+                                selectedAgent === 'codex' ? handleCodexLogin :
+                                  handleGeminiLogin
+                          }
+                          onLogout={
+                            selectedAgent === 'claude' ? handleClaudeLogout :
+                              selectedAgent === 'cursor' ? handleCursorLogout :
+                                selectedAgent === 'codex' ? handleCodexLogout :
+                                  handleGeminiLogout
+                          }
+                        />
+                      </div>
                     )}
 
                     {/* Permissions Category */}
@@ -1426,9 +1602,9 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       <McpServersContent
                         agent="cursor"
                         servers={cursorMcpServers}
-                        onAdd={() => {/* TODO: Add cursor MCP form */}}
-                        onEdit={(server) => {/* TODO: Edit cursor MCP form */}}
-                        onDelete={(serverId) => {/* TODO: Delete cursor MCP */}}
+                        onAdd={() => {/* TODO: Add cursor MCP form */ }}
+                        onEdit={(server) => {/* TODO: Edit cursor MCP form */ }}
+                        onDelete={(serverId) => {/* TODO: Delete cursor MCP */ }}
                       />
                     )}
 
@@ -1458,34 +1634,32 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
-                  
+
                   <form onSubmit={handleMcpSubmit} className="p-4 space-y-4">
 
                     {!editingMcpServer && (
-                    <div className="flex gap-2 mb-4">
-                      <button
-                        type="button"
-                        onClick={() => setMcpFormData(prev => ({...prev, importMode: 'form'}))}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                          mcpFormData.importMode === 'form'
+                      <div className="flex gap-2 mb-4">
+                        <button
+                          type="button"
+                          onClick={() => setMcpFormData(prev => ({ ...prev, importMode: 'form' }))}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${mcpFormData.importMode === 'form'
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {t('mcpForm.importMode.form')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMcpFormData(prev => ({...prev, importMode: 'json'}))}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                          mcpFormData.importMode === 'json'
+                            }`}
+                        >
+                          {t('mcpForm.importMode.form')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMcpFormData(prev => ({ ...prev, importMode: 'json' }))}
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${mcpFormData.importMode === 'json'
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        {t('mcpForm.importMode.json')}
-                      </button>
-                    </div>
+                            }`}
+                        >
+                          {t('mcpForm.importMode.json')}
+                        </button>
+                      </div>
                     )}
 
                     {/* Show current scope when editing */}
@@ -1521,12 +1695,11 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() => setMcpFormData(prev => ({...prev, scope: 'user', projectPath: ''}))}
-                              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                                mcpFormData.scope === 'user'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                              }`}
+                              onClick={() => setMcpFormData(prev => ({ ...prev, scope: 'user', projectPath: '' }))}
+                              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${mcpFormData.scope === 'user'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                }`}
                             >
                               <div className="flex items-center justify-center gap-2">
                                 <Globe className="w-4 h-4" />
@@ -1535,12 +1708,11 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                             </button>
                             <button
                               type="button"
-                              onClick={() => setMcpFormData(prev => ({...prev, scope: 'local'}))}
-                              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
-                                mcpFormData.scope === 'local'
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                              }`}
+                              onClick={() => setMcpFormData(prev => ({ ...prev, scope: 'local' }))}
+                              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${mcpFormData.scope === 'local'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                }`}
                             >
                               <div className="flex items-center justify-center gap-2">
                                 <FolderOpen className="w-4 h-4" />
@@ -1564,7 +1736,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                             </label>
                             <select
                               value={mcpFormData.projectPath}
-                              onChange={(e) => setMcpFormData(prev => ({...prev, projectPath: e.target.value}))}
+                              onChange={(e) => setMcpFormData(prev => ({ ...prev, projectPath: e.target.value }))}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                               required={mcpFormData.scope === 'local'}
                             >
@@ -1594,7 +1766,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                         <Input
                           value={mcpFormData.name}
                           onChange={(e) => {
-                            setMcpFormData(prev => ({...prev, name: e.target.value}));
+                            setMcpFormData(prev => ({ ...prev, name: e.target.value }));
                           }}
                           placeholder={t('mcpForm.placeholders.serverName')}
                           required
@@ -1609,7 +1781,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                           <select
                             value={mcpFormData.type}
                             onChange={(e) => {
-                              setMcpFormData(prev => ({...prev, type: e.target.value}));
+                              setMcpFormData(prev => ({ ...prev, type: e.target.value }));
                             }}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                           >
@@ -1644,7 +1816,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                           <textarea
                             value={mcpFormData.jsonInput}
                             onChange={(e) => {
-                              setMcpFormData(prev => ({...prev, jsonInput: e.target.value}));
+                              setMcpFormData(prev => ({ ...prev, jsonInput: e.target.value }));
                               // Validate JSON as user types
                               try {
                                 if (e.target.value.trim()) {
@@ -1733,33 +1905,57 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                     {/* Environment Variables - Only show in form mode */}
                     {mcpFormData.importMode === 'form' && (
                       <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        {t('mcpForm.fields.envVars')}
-                      </label>
-                      <textarea
-                        value={Object.entries(mcpFormData.config.env || {}).map(([k, v]) => `${k}=${v}`).join('\n')}
-                        onChange={(e) => {
-                          const env = {};
-                          e.target.value.split('\n').forEach(line => {
-                            const [key, ...valueParts] = line.split('=');
-                            if (key && key.trim()) {
-                              env[key.trim()] = valueParts.join('=').trim();
-                            }
-                          });
-                          updateMcpConfig('env', env);
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                        rows="3"
-                        placeholder="API_KEY=your-key&#10;DEBUG=true"
-                      />
-                    </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <label className="block text-sm font-medium text-foreground">
+                            {t('mcpForm.fields.envVars')}
+                          </label>
+                          <div className="group relative">
+                            <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                            </svg>
+                            <div className="invisible group-hover:visible absolute left-0 top-6 w-80 p-3 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10 border border-gray-700">
+                              <div className="font-semibold mb-1">{t('mcpForm.fields.envVarsHelp')}</div>
+                              <div className="mb-2">{t('mcpForm.fields.envVarsSyntax')}</div>
+                              <div className="bg-gray-800 dark:bg-gray-900 p-2 rounded font-mono">
+                                {t('mcpForm.fields.envVarsExample')}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <textarea
+                          value={Object.entries(mcpFormData.config.env || {}).map(([k, v]) => `${k}=${v}`).join('\n')}
+                          onChange={(e) => {
+                            const env = {};
+                            e.target.value.split('\n').forEach(line => {
+                              const [key, ...valueParts] = line.split('=');
+                              if (key && key.trim()) {
+                                env[key.trim()] = valueParts.join('=').trim();
+                              }
+                            });
+                            updateMcpConfig('env', env);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                          rows="3"
+                          placeholder="MYSQL_HOST=${MYSQL_HOST:-localhost}&#10;MYSQL_USER=${MYSQL_USER:-root}&#10;API_KEY=${API_KEY}"
+                        />
+                      </div>
                     )}
 
                     {mcpFormData.importMode === 'form' && (mcpFormData.type === 'sse' || mcpFormData.type === 'http') && (
                       <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">
-                          {t('mcpForm.fields.headers')}
-                        </label>
+                        <div className="flex items-center gap-2 mb-2">
+                          <label className="block text-sm font-medium text-foreground">
+                            {t('mcpForm.fields.headers')}
+                          </label>
+                          <div className="group relative">
+                            <svg className="w-4 h-4 text-blue-500 cursor-help" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                            </svg>
+                            <div className="invisible group-hover:visible absolute left-0 top-6 w-72 p-2 bg-gray-900 dark:bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10 border border-gray-700">
+                              {t('mcpForm.fields.headersHelp')}
+                            </div>
+                          </div>
+                        </div>
                         <textarea
                           value={Object.entries(mcpFormData.config.headers || {}).map(([k, v]) => `${k}=${v}`).join('\n')}
                           onChange={(e) => {
@@ -1774,7 +1970,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                           }}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                           rows="3"
-                          placeholder="Authorization=Bearer token&#10;X-API-Key=your-key"
+                          placeholder="Authorization=Bearer ${API_TOKEN}&#10;X-API-Key=${API_KEY}"
                         />
                       </div>
                     )}
@@ -1817,7 +2013,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
                       </label>
                       <Input
                         value={codexMcpFormData.name}
-                        onChange={(e) => setCodexMcpFormData(prev => ({...prev, name: e.target.value}))}
+                        onChange={(e) => setCodexMcpFormData(prev => ({ ...prev, name: e.target.value }))}
                         placeholder={t('mcpForm.placeholders.serverName')}
                         required
                       />
@@ -1968,9 +2164,9 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }) {
         onComplete={handleLoginComplete}
         isAuthenticated={
           loginProvider === 'claude' ? claudeAuthStatus.authenticated :
-          loginProvider === 'cursor' ? cursorAuthStatus.authenticated :
-          loginProvider === 'codex' ? codexAuthStatus.authenticated :
-          false
+            loginProvider === 'cursor' ? cursorAuthStatus.authenticated :
+              loginProvider === 'codex' ? codexAuthStatus.authenticated :
+                false
         }
       />
     </div>

@@ -88,33 +88,37 @@ router.get('/codex/status', async (req, res) => {
 });
 
 async function checkClaudeCredentials() {
-  try {
-    const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
-    const content = await fs.readFile(credPath, 'utf8');
-    const creds = JSON.parse(content);
+  return new Promise((resolve) => {
+    let stdout = '';
+    const childProcess = spawn('claude', ['--version'], { shell: true });
 
-    const oauth = creds.claudeAiOauth;
-    if (oauth && oauth.accessToken) {
-      const isExpired = oauth.expiresAt && Date.now() >= oauth.expiresAt;
+    childProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
 
-      if (!isExpired) {
-        return {
+    childProcess.on('error', (err) => {
+      resolve({
+        authenticated: false,
+        email: null,
+        error: 'Claude CLI not found'
+      });
+    });
+
+    childProcess.on('close', (code) => {
+      if (code === 0) {
+        resolve({
           authenticated: true,
-          email: creds.email || creds.user || null
-        };
+          email: stdout.trim() || 'Installed'
+        });
+      } else {
+        resolve({
+          authenticated: false,
+          email: null,
+          error: 'Claude CLI not installed'
+        });
       }
-    }
-
-    return {
-      authenticated: false,
-      email: null
-    };
-  } catch (error) {
-    return {
-      authenticated: false,
-      email: null
-    };
-  }
+    });
+  });
 }
 
 function checkCursorStatus() {

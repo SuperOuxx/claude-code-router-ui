@@ -1,5 +1,5 @@
-// Service Worker for Claude Code UI PWA
-const CACHE_NAME = 'claude-ui-v1';
+// Service Worker for CCR UI PWA
+const CACHE_NAME = 'ccr-ui-v1';
 const urlsToCache = [
   '/',
   '/index.html',

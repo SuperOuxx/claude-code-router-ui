@@ -1,7 +1,7 @@
 {
   "name": "@siteboon/claude-code-ui",
   "version": "1.14.0",
-  "description": "A web-based UI for Claude Code CLI",
+  "description": "A web-based UI for CCR (claude-code-router) CLI",
   "type": "module",
   "main": "server/index.js",
   "bin": {

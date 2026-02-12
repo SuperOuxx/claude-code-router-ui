@@ -1,6 +1,7 @@
 import ClaudeLogo from '../ClaudeLogo';
 import CursorLogo from '../CursorLogo';
 import CodexLogo from '../CodexLogo';
+import GeminiLogo from '../GeminiLogo';
 import { useTranslation } from 'react-i18next';
 
 const agentConfig = {
@@ -18,6 +19,11 @@ const agentConfig = {
     name: 'Codex',
     color: 'gray',
     Logo: CodexLogo,
+  },
+  gemini: {
+    name: 'Gemini',
+    color: 'green',
+    Logo: GeminiLogo,
   },
 };
 
@@ -39,6 +45,12 @@ const colorClasses = {
     borderBottom: 'border-b-gray-700 dark:border-b-gray-300',
     bg: 'bg-gray-100 dark:bg-gray-800/50',
     dot: 'bg-gray-700 dark:bg-gray-300',
+  },
+  green: {
+    border: 'border-l-green-500 md:border-l-green-500',
+    borderBottom: 'border-b-green-500',
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    dot: 'bg-green-500',
   },
 };
 

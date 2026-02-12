@@ -1,0 +1,89 @@
+{
+  "mcpServers": {
+    "playwright-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@executeautomation/playwright-mcp-server"
+      ],
+      "env": {
+        "HEADLESS": "true",
+        "BROWSER": "chromium"
+      }
+    }
+  },
+  "description": "Playwright MCP 服务配置",
+  "capabilities": [
+    "浏览器自动化",
+    "UI测试执行",
+    "截图和录屏",
+    "元素定位和交互"
+  ],
+  "permissions": {
+    "execute": [
+      "导航到URL",
+      "点击元素",
+      "填写表单",
+      "执行JavaScript",
+      "截图"
+    ],
+    "read": [
+      "获取页面内容",
+      "读取元素属性",
+      "检查元素可见性"
+    ]
+  },
+  "supported_actions": {
+    "navigation": [
+      "navigate_to_url",
+      "go_back",
+      "go_forward",
+      "refresh_page"
+    ],
+    "interaction": [
+      "click",
+      "fill",
+      "select_option",
+      "hover",
+      "drag_and_drop"
+    ],
+    "querying": [
+      "get_text",
+      "get_attribute",
+      "screenshot",
+      "evaluate_script"
+    ],
+    "waiting": [
+      "wait_for_selector",
+      "wait_for_navigation",
+      "wait_for_timeout"
+    ]
+  },
+  "example_usage": {
+    "test_scenario": "登录功能测试",
+    "steps": [
+      {
+        "action": "navigate",
+        "url": "https://example.com/login"
+      },
+      {
+        "action": "fill",
+        "selector": "#username",
+        "value": "testuser"
+      },
+      {
+        "action": "fill",
+        "selector": "#password",
+        "value": "password123"
+      },
+      {
+        "action": "click",
+        "selector": "button[type='submit']"
+      },
+      {
+        "action": "screenshot",
+        "name": "login-success"
+      }
+    ]
+  }
+}

@@ -11,11 +11,12 @@
  * No session protection logic is implemented here - it's purely a props bridge.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useImperativeHandle, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown, Plus, X } from 'lucide-react';
 import ChatInterface from './ChatInterface';
 import CodeEditor from './CodeEditor';
+import MarkdownFileEditor from './MarkdownFileEditor';
 import StandaloneShell from './StandaloneShell';
 import GitPanel from './GitPanel';
 import ErrorBoundary from './ErrorBoundary';
@@ -31,7 +32,20 @@ import { useTasksSettings } from '../contexts/TasksSettingsContext';
 import { api } from '../utils/api';
 import { cn } from '../lib/utils';
 
-function MainContent({
+const CHAT_PANEL_DEFAULT_WIDTH = 500;
+const CHAT_PANEL_MIN_WIDTH = 250;
+
+function getFileBaseName(filePath) {
+  return filePath.split(/[\\/]/).pop() || filePath;
+}
+
+function isMarkdownFileName(fileName) {
+  if (!fileName) return false;
+  const name = fileName.toLowerCase();
+  return name.endsWith('.md') || name.endsWith('.markdown');
+}
+
+const MainContent = React.memo(React.forwardRef(function MainContent({
   selectedProject,
   selectedSession,
   activeTab,
@@ -62,17 +76,20 @@ function MainContent({
   externalMessageUpdate,  // Trigger for external CLI updates to current session
   projects,               // All projects data
   onNewSession            // Create new session handler
-}) {
+}, ref) {
   const { t } = useTranslation();
-  const [editingFile, setEditingFile] = useState(null);
+  const [openFiles, setOpenFiles] = useState([]);
+  const [activeFileId, setActiveFileId] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [editorWidth, setEditorWidth] = useState(null); // null means fill available space
-  const [chatWidth, setChatWidth] = useState('500px');
+  const [chatWidth, setChatWidth] = useState(CHAT_PANEL_DEFAULT_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
+  const [isChatResizing, setIsChatResizing] = useState(false);
   const [editorExpanded, setEditorExpanded] = useState(true); // Start expanded by default
   const resizeRef = useRef(null);
   const chatResizeRef = useRef(null);
+  const chatResizeMetrics = useRef(null);
   const codeEditorRef = useRef(null);
 
   // Session dropdown state
@@ -152,31 +169,117 @@ function MainContent({
     return [...claudeSessions, ...cursorSessions, ...codexSessions].sort((a, b) => normalizeDate(b) - normalizeDate(a));
   };
 
-  const handleFileOpen = async (filePath, diffInfo = null) => {
+  const isMarkdownFile = useCallback(isMarkdownFileName, []);
+
+  // Generate a unique ID for each file tab
+  const generateFileId = (filePath, projectName) => {
+    return `${projectName}:${filePath}`;
+  };
+
+  const handleFileOpen = async (filePath, diffInfo = null, projectNameOverride = null) => {
     // Create a file object that CodeEditor expects
+    const projectName = projectNameOverride || selectedProject?.name;
+    const fileId = generateFileId(filePath, projectName);
+
     const nextFile = {
-      name: filePath.split('/').pop(),
+      id: fileId,
+      name: getFileBaseName(filePath),
       path: filePath,
-      projectName: selectedProject?.name,
-      diffInfo: diffInfo // Pass along diff information if available
+      projectName,
+      diffInfo // Pass along diff information if available
     };
 
-    if (editingFile?.projectName === nextFile.projectName && editingFile?.path === nextFile.path) {
+    // Check if file is already open
+    const existingFileIndex = openFiles.findIndex(f => f.id === fileId);
+
+    if (existingFileIndex !== -1) {
+      // File is already open, just switch to it
+      setActiveFileId(fileId);
       return;
     }
 
-    if (editingFile && codeEditorRef.current?.prepareForSwitch) {
+    // Check if we need to prepare for switching (unsaved changes)
+    const activeFile = openFiles.find(f => f.id === activeFileId);
+    if (activeFile && codeEditorRef.current?.prepareForSwitch) {
       const ok = await codeEditorRef.current.prepareForSwitch();
       if (!ok) return;
     }
 
-    setEditingFile(nextFile);
+    // Add new file to open files
+    setOpenFiles(prev => [...prev, nextFile]);
+    setActiveFileId(fileId);
   };
 
   const handleCloseEditor = () => {
-    setEditingFile(null);
-    setEditorExpanded(false);
+    // Close active file tab
+    if (activeFileId) {
+      setOpenFiles(prev => {
+        const newFiles = prev.filter(f => f.id !== activeFileId);
+        // If there are still files open, activate the last one or the one before the closed one
+        if (newFiles.length > 0) {
+          const closedIndex = prev.findIndex(f => f.id === activeFileId);
+          const nextActiveIndex = closedIndex > 0 ? closedIndex - 1 : 0;
+          setActiveFileId(newFiles[nextActiveIndex].id);
+        } else {
+          setActiveFileId(null);
+        }
+        return newFiles;
+      });
+    }
   };
+
+  const handleCloseFileTab = (fileId, e) => {
+    e.stopPropagation(); // Prevent switching to this tab when closing
+
+    setOpenFiles(prev => {
+      const newFiles = prev.filter(f => f.id !== fileId);
+
+      // If we closed the active file, activate another one
+      if (fileId === activeFileId) {
+        if (newFiles.length > 0) {
+          const closedIndex = prev.findIndex(f => f.id === fileId);
+          const nextActiveIndex = closedIndex > 0 ? closedIndex - 1 : 0;
+          setActiveFileId(newFiles[nextActiveIndex].id);
+        } else {
+          setActiveFileId(null);
+        }
+      }
+
+      return newFiles;
+    });
+  };
+
+  const handleSwitchFileTab = (fileId) => {
+    const activeFile = openFiles.find(f => f.id === activeFileId);
+    if (activeFile && codeEditorRef.current?.prepareForSwitch) {
+      codeEditorRef.current.prepareForSwitch().then(ok => {
+        if (ok) {
+          setActiveFileId(fileId);
+        }
+      });
+    } else {
+      setActiveFileId(fileId);
+    }
+  };
+
+  // Get the currently active file object
+  const activeFile = useMemo(() => {
+    return openFiles.find(f => f.id === activeFileId) || null;
+  }, [openFiles, activeFileId]);
+
+  // Keep backward compatibility - use activeFile instead of editingFile
+  const editingFile = activeFile;
+
+  const showChatPanel = activeTab === 'chat' && (!isMobile || !editingFile);
+  const editorProjectPath = useMemo(() => {
+    const editorProject = projects?.find((p) => p.name === editingFile?.projectName) || selectedProject;
+    return editorProject?.path;
+  }, [projects, selectedProject, editingFile?.projectName]);
+
+  useImperativeHandle(ref, () => ({
+    openFile: handleFileOpen,
+    closeFile: handleCloseEditor
+  }));
 
   const handleToggleEditorExpand = () => {
     const newExpanded = !editorExpanded;
@@ -220,6 +323,24 @@ function MainContent({
     e.preventDefault();
   };
 
+  const handleChatResizeMouseDown = useCallback((event) => {
+    if (isMobile) return;
+
+    event.preventDefault();
+
+    const container = chatResizeRef.current?.parentElement;
+    if (!container) return;
+
+    const { right, width } = container.getBoundingClientRect();
+
+    chatResizeMetrics.current = {
+      containerRight: right,
+      containerWidth: width
+    };
+
+    setIsChatResizing(true);
+  }, [isMobile]);
+
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (!isResizing) return;
@@ -257,6 +378,40 @@ function MainContent({
       document.body.style.userSelect = '';
     };
   }, [isResizing]);
+
+  useEffect(() => {
+    if (!isChatResizing) return;
+
+    const handleMouseMove = (event) => {
+      if (!chatResizeMetrics.current) return;
+
+      const { containerRight, containerWidth } = chatResizeMetrics.current;
+      const nextWidth = containerRight - event.clientX;
+      const clampedWidth = Math.max(
+        CHAT_PANEL_MIN_WIDTH,
+        Math.min(containerWidth, nextWidth)
+      );
+
+      setChatWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsChatResizing(false);
+      chatResizeMetrics.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isChatResizing]);
 
   if (isLoading) {
     return (
@@ -550,11 +705,41 @@ function MainContent({
       </div>
 
       {/* Three-Column Layout: Editor | Chat */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden relative">
         {/* Middle Column: Editor */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {editingFile && !isMobile ? (
+        <div
+          className="flex-1 flex flex-col min-h-0 overflow-hidden"
+          style={showChatPanel ? { maxWidth: `calc(100% - ${chatWidth}px)` } : undefined}
+        >
+          {editingFile ? (
               <>
+                {/* File Tabs Bar */}
+                {openFiles.length > 0 && (
+                  <div className="flex items-center bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+                    <div className="flex">
+                      {openFiles.map((file) => (
+                        <div
+                          key={file.id}
+                          onClick={() => handleSwitchFileTab(file.id)}
+                          className={`group flex items-center gap-2 px-3 py-2 text-sm border-r border-gray-200 dark:border-gray-700 cursor-pointer transition-colors min-w-[120px] max-w-[200px] ${
+                            file.id === activeFileId
+                              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-t-2 border-t-blue-500'
+                              : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          <span className="truncate flex-1">{file.name}</span>
+                          <button
+                            onClick={(e) => handleCloseFileTab(file.id, e)}
+                            className="opacity-0 group-hover:opacity-100 hover:bg-gray-300 dark:hover:bg-gray-600 rounded p-0.5 transition-all"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Resize handle - only show when editor is not expanded */}
                 {!editorExpanded && (
                   <div
@@ -571,15 +756,24 @@ function MainContent({
                   className={`h-full overflow-hidden ${editorExpanded ? 'flex-1' : ''}`}
                   style={editorExpanded ? {} : { width: `${editorWidth}px` }}
                 >
-                  <CodeEditor
-                    ref={codeEditorRef}
-                    file={editingFile}
-                    onClose={handleCloseEditor}
-                    projectPath={selectedProject?.path}
-                    isSidebar={true}
-                    isExpanded={editorExpanded}
-                    onToggleExpand={handleToggleEditorExpand}
-                  />
+                  {/* Use MarkdownFileEditor for markdown files, CodeEditor for other files */}
+                  {isMarkdownFile(editingFile.name) ? (
+                    <MarkdownFileEditor
+                      file={editingFile}
+                      onClose={handleCloseEditor}
+                      isActive={true}
+                    />
+                  ) : (
+                    <CodeEditor
+                      ref={codeEditorRef}
+                      file={editingFile}
+                      onClose={handleCloseEditor}
+                      projectPath={editorProjectPath}
+                      isSidebar={true}
+                      isExpanded={editorExpanded}
+                      onToggleExpand={handleToggleEditorExpand}
+                    />
+                  )}
                 </div>
               </>
             ) : activeTab === 'shell' ? (
@@ -637,51 +831,23 @@ function MainContent({
             )}
         </div>
 
-        {/* Right Column: Chat Interface - Resizable width */}
+        {/* Right Column: Chat Interface - Fixed right edge, resizable width */}
         <div
           ref={chatResizeRef}
-          className={`min-w-[250px] flex-shrink-0 border-l border-gray-200 dark:border-gray-700 ${activeTab === 'chat' ? 'flex' : 'hidden'}`}
-          style={{ width: chatWidth }}
+          className={`min-w-[250px] border-l border-gray-200 dark:border-gray-700 ${showChatPanel ? 'flex' : 'hidden'}`}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: `${chatWidth}px`
+          }}
         >
           <div className="h-full overflow-hidden flex flex-col relative">
-            {/* Resize Handle */}
+            {/* Resize Handle - Left edge of chat panel */}
             <div
-              className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors group z-10 -ml-0.5"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                const startX = e.clientX;
-                const container = chatResizeRef.current?.parentElement;
-                if (!container) return;
-
-                const startWidth = chatResizeRef.current?.offsetWidth || 300;
-                const containerWidth = container.offsetWidth;
-
-                const handleMouseMove = (e) => {
-                  // Calculate new width: moving left increases width
-                  const deltaX = startX - e.clientX;
-                  const newWidth = startWidth + deltaX;
-
-                  // Dynamic min/max based on container width
-                  const minWidth = 250;
-                  const maxWidth = Math.min(900, containerWidth - 400); // Leave at least 400px for editor
-
-                  if (newWidth >= minWidth && newWidth <= maxWidth) {
-                    setChatWidth(`${newWidth}px`);
-                  }
-                };
-
-                const handleMouseUp = () => {
-                  document.removeEventListener('mousemove', handleMouseMove);
-                  document.removeEventListener('mouseup', handleMouseUp);
-                  document.body.style.cursor = '';
-                  document.body.style.userSelect = '';
-                };
-
-                document.addEventListener('mousemove', handleMouseMove);
-                document.addEventListener('mouseup', handleMouseUp);
-                document.body.style.cursor = 'col-resize';
-                document.body.style.userSelect = 'none';
-              }}
+              className="absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-blue-500 dark:hover:bg-blue-600 cursor-col-resize transition-colors group z-10"
+              onMouseDown={handleChatResizeMouseDown}
             >
               <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-transparent group-hover:bg-blue-500 dark:group-hover:bg-blue-600 transition-colors rounded-full" />
             </div>
@@ -714,17 +880,6 @@ function MainContent({
           </div>
         </div>
       </div>
-
-      {/* Code Editor Modal for Mobile */}
-      {editingFile && isMobile && (
-        <CodeEditor
-          ref={codeEditorRef}
-          file={editingFile}
-          onClose={handleCloseEditor}
-          projectPath={selectedProject?.path}
-          isSidebar={false}
-        />
-      )}
 
       {/* Task Detail Modal */}
       {shouldShowTasksTab && showTaskDetail && selectedTask && (
@@ -784,6 +939,6 @@ function MainContent({
       )}
     </div>
   );
-}
+}));
 
-export default React.memo(MainContent);
+export default MainContent;

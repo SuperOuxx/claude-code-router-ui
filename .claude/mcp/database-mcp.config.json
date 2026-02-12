@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "database-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres"
+      ],
+      "env": {
+        "POSTGRES_CONNECTION_STRING": "${DATABASE_URL}"
+      }
+    }
+  },
+  "description": "数据库 MCP 服务配置",
+  "capabilities": [
+    "数据库查询",
+    "测试数据生成",
+    "数据验证",
+    "数据库连接测试"
+  ],
+  "permissions": {
+    "read": [
+      "SELECT queries",
+      "Database schema inspection",
+      "Test data retrieval"
+    ],
+    "write": [
+      "INSERT test data",
+      "CREATE test tables",
+      "UPDATE test records"
+    ],
+    "execute": [
+      "Run test scripts",
+      "Execute stored procedures"
+    ]
+  },
+  "example_usage": {
+    "query": "SELECT * FROM users WHERE id = $1",
+    "insert_test_data": "INSERT INTO test_users (username, email) VALUES ($1, $2)",
+    "create_test_table": "CREATE TEMP TABLE test_users (id SERIAL PRIMARY KEY, username VARCHAR(50))"
+  }
+}

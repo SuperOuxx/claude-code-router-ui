@@ -350,7 +350,7 @@ const Onboarding = ({ onComplete }) => {
                     </div>
                     <div>
                       <div className="font-medium text-foreground flex items-center gap-2">
-                        Claude Code
+                        CCR (claude-code-router)
                         {claudeAuthStatus.authenticated && <Check className="w-4 h-4 text-green-500" />}
                       </div>
                       <div className="text-xs text-muted-foreground">

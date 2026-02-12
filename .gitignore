@@ -13,7 +13,7 @@ build/
 out/
 
 # Environment variables
-.env
+# .env
 .env.local
 .env.development.local
 .env.test.local
@@ -104,7 +104,7 @@ test-results/
 .netlify
 
 # AI specific
-.claude/
+# .claude/
 .cursor/
 .roo/
 .taskmaster/
@@ -112,7 +112,6 @@ test-results/
 .windsurf/
 .serena/
 CLAUDE.md
-.mcp.json
 
 
 # Database files
@@ -135,3 +134,5 @@ dev-debug.log
 # Task files
 tasks.json
 tasks/ 
+
+del-nul.bat

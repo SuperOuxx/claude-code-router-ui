@@ -1,10 +1,13 @@
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { LogIn } from 'lucide-react';
+import { LogIn, Settings as SettingsIcon } from 'lucide-react';
 import ClaudeLogo from '../ClaudeLogo';
 import CursorLogo from '../CursorLogo';
 import CodexLogo from '../CodexLogo';
+import GeminiLogo from '../GeminiLogo';
 import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
+import { authenticatedFetch } from '../../utils/api';
 
 const agentConfig = {
   claude: {
@@ -37,12 +40,54 @@ const agentConfig = {
     subtextClass: 'text-gray-700 dark:text-gray-300',
     buttonClass: 'bg-gray-800 hover:bg-gray-900 dark:bg-gray-700 dark:hover:bg-gray-600',
   },
+  gemini: {
+    name: 'Gemini',
+    description: 'Google Gemini AI assistant',
+    Logo: GeminiLogo,
+    bgClass: 'bg-green-50 dark:bg-green-900/20',
+    borderClass: 'border-green-200 dark:border-green-800',
+    textClass: 'text-green-900 dark:text-green-100',
+    subtextClass: 'text-green-700 dark:text-green-300',
+    buttonClass: 'bg-green-600 hover:bg-green-700',
+  },
 };
 
-export default function AccountContent({ agent, authStatus, onLogin }) {
+export default function AccountContent({ agent, agentId, authStatus, onLogin }) {
   const { t } = useTranslation('settings');
-  const config = agentConfig[agent];
+  const currentAgent = agent ?? agentId ?? 'claude';
+  const config = agentConfig[currentAgent] ?? agentConfig.claude;
   const { Logo } = config;
+
+  // CCR UI configuration state
+  const [isCcrExecuting, setIsCcrExecuting] = useState(false);
+  const [ccrOutput, setCcrOutput] = useState('');
+
+  const handleCcrUi = async () => {
+    setIsCcrExecuting(true);
+    setCcrOutput('Launching CCR UI configuration...\n');
+
+    try {
+      const response = await authenticatedFetch('/api/system/ccr-ui', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setCcrOutput(prev => prev + data.output + '\n');
+        setCcrOutput(prev => prev + '\n✅ ' + (data.message || 'CCR UI launched successfully') + '\n');
+      } else {
+        setCcrOutput(prev => prev + '\n❌ Failed: ' + (data.error || 'Unknown error') + '\n');
+        if (data.errorOutput) {
+          setCcrOutput(prev => prev + data.errorOutput + '\n');
+        }
+      }
+    } catch (error) {
+      setCcrOutput(prev => prev + '\n❌ Error: ' + error.message + '\n');
+    } finally {
+      setIsCcrExecuting(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -50,7 +95,7 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
         <Logo className="w-6 h-6" />
         <div>
           <h3 className="text-lg font-medium text-foreground">{config.name}</h3>
-          <p className="text-sm text-muted-foreground">{t(`agents.account.${agent}.description`)}</p>
+          <p className="text-sm text-muted-foreground">{t(`agents.account.${currentAgent}.description`)}</p>
         </div>
       </div>
 
@@ -66,9 +111,11 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
                 {authStatus?.loading ? (
                   t('agents.authStatus.checkingAuth')
                 ) : authStatus?.authenticated ? (
-                  t('agents.authStatus.loggedInAs', { email: authStatus.email || t('agents.authStatus.authenticatedUser') })
+                  currentAgent === 'claude'
+                    ? t('agents.authStatus.installedVersion', { email: authStatus.email || t('agents.authStatus.authenticatedUser') })
+                    : t('agents.authStatus.loggedInAs', { email: authStatus.email || t('agents.authStatus.authenticatedUser') })
                 ) : (
-                  t('agents.authStatus.notConnected')
+                  currentAgent === 'claude' ? t('agents.authStatus.notInstalled') : t('agents.authStatus.notConnected')
                 )}
               </div>
             </div>
@@ -79,11 +126,11 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
                 </Badge>
               ) : authStatus?.authenticated ? (
                 <Badge variant="success" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                  {t('agents.authStatus.connected')}
+                  {currentAgent === 'claude' ? t('agents.authStatus.installed') : t('agents.authStatus.connected')}
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
-                  {t('agents.authStatus.disconnected')}
+                  {currentAgent === 'claude' ? t('agents.authStatus.notInstalled') : t('agents.authStatus.disconnected')}
                 </Badge>
               )}
             </div>
@@ -117,6 +164,49 @@ export default function AccountContent({ agent, authStatus, onLogin }) {
               <div className="text-sm text-red-600 dark:text-red-400">
                 {t('agents.error', { error: authStatus.error })}
               </div>
+            </div>
+          )}
+
+          {/* CCR Configuration - Only for Claude */}
+          {currentAgent === 'claude' && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className={`font-medium ${config.textClass}`}>
+                    CCR Configuration
+                  </div>
+                  <div className={`text-sm ${config.subtextClass}`}>
+                    Launch CCR UI configuration interface
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCcrUi}
+                  disabled={isCcrExecuting}
+                  className={`${config.buttonClass} text-white`}
+                  size="sm"
+                >
+                  {isCcrExecuting ? (
+                    <>
+                      <div className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <SettingsIcon className="w-4 h-4 mr-2" />
+                      Configure CCR
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* CCR Output */}
+              {ccrOutput && (
+                <div className="mt-4">
+                  <div className="bg-gray-900 dark:bg-gray-950 rounded-lg p-4 border border-gray-700 max-h-48 overflow-y-auto">
+                    <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap">{ccrOutput}</pre>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
