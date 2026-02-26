@@ -55,6 +55,7 @@
     "@codemirror/theme-one-dark": "^6.1.2",
     "@codemirror/view": "^6.39.11",
     "@iarna/toml": "^2.2.5",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@octokit/rest": "^22.0.0",
     "@openai/codex-sdk": "^0.75.0",
     "@replit/codemirror-minimap": "^0.5.2",

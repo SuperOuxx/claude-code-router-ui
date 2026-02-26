@@ -67,6 +67,7 @@ import projectsRoutes from './routes/projects.js';
 import cliAuthRoutes from './routes/cli-auth.js';
 import userRoutes from './routes/user.js';
 import codexRoutes from './routes/codex.js';
+import searchRoutes from './routes/search.js';
 import { initializeDatabase } from './database/db.js';
 import { validateApiKey, authenticateToken, authenticateWebSocket } from './middleware/auth.js';
 
@@ -287,6 +288,9 @@ app.use('/api/user', authenticateToken, userRoutes);
 
 // Codex API Routes (protected)
 app.use('/api/codex', authenticateToken, codexRoutes);
+
+// Search API Routes (protected)
+app.use('/api/search', authenticateToken, searchRoutes);
 
 // Agent API Routes (uses API key authentication)
 app.use('/api/agent', agentRoutes);
@@ -2058,6 +2062,11 @@ async function startServer() {
                 }
             }
         }
+
+        // Auto-configure Web Search MCP
+        const { configureWebSearchMCP } = await import('./utils/mcpAutoConfig.js');
+        await configureWebSearchMCP();
+
 
 
         if (!isProduction) {

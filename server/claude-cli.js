@@ -155,7 +155,7 @@ export async function queryClaudeCLI(command, options = {}, ws) {
     ...argsPrefix,
     // CCR expects the prompt to be provided via -p in print mode.
     '-p',
-    JSON.stringify(modifiedCommand || ''),
+    (modifiedCommand || '').replace(/\r?\n/g, '\\n'),
     '--output-format=stream-json',
     '--include-partial-messages',
     '--verbose',
@@ -378,7 +378,7 @@ export async function queryClaudeOfficialCLI(command, options = {}, ws) {
   const cliArgs = [
     ...argsPrefix,
     '-p',
-    JSON.stringify(modifiedCommand || ''),
+    (modifiedCommand || '').replace(/\r?\n/g, '\\n'),
     '--output-format=stream-json',
     '--include-partial-messages',
     '--verbose',
